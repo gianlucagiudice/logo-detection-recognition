@@ -75,8 +75,8 @@ def generate_yolo_labels(xml_file_path: Path, obj_class=0):
         dict(xmin=int(obj.find('bndbox/xmin').text),
              ymin=int(obj.find('bndbox/ymin').text),
              xmax=int(obj.find('bndbox/xmax').text),
-             ymax=int(obj.find('bndbox/ymax').text)
-             )
+             ymax=int(obj.find('bndbox/ymax').text),
+             brand=obj.find('name').text)
         for obj in root.findall('object')
     ]
 
@@ -91,10 +91,9 @@ def generate_yolo_labels(xml_file_path: Path, obj_class=0):
                      f'{round(h_middle, 6)} '
                      f'{round(obj_width, 6)} '
                      f'{round(obj_hight, 6)}')
-    # Extract category
-    category = set([brand.text for brand in tree.findall('object/name')])
-    assert len(category) == 1
-    return '\n'.join(lines), objs, category.pop(), tree.find('filename').text
+    # Extract brands
+    brands = [obj['brand'] for obj in objs]
+    return '\n'.join(lines), objs, brands, tree.find('filename').text
 
 
 def create_dataset_split(split_filename: Path, images) -> None:
@@ -151,33 +150,41 @@ for i, im_path in tqdm.tqdm(enumerate(all_images), total=len(all_images)):
     # Generate new name
     filename = Path(f"{'0' * (len(str(len(all_images))) - len(str(i)))}{str(i)}.jpg")
     # Generate label file
-    yolo_label_content, objects, category, original_filename = generate_yolo_labels(im_path.with_suffix('.xml'))
+    yolo_label_content, objects, brands, original_filename = generate_yolo_labels(im_path.with_suffix('.xml'))
     # Add metadata full image
+    *_, category, brand, _ = os.path.normpath(im_path).split(os.path.sep)
     new_row_full_image = dict(
         original_path=str(im_path),
         new_path=str(images_path / filename),
         filename=original_filename,
-        category=category
+        category=category,
+        brand=brand
     )
     df_metadata_full = pd.concat([df_metadata_full, pd.DataFrame.from_records([new_row_full_image])])
     # Crop all objects
     img = cv2.imread(str(im_path))
 
-    for j, obj in enumerate(objects):
+    for brand, obj in zip(brands, objects):
         # Crop the logo
         cropped_image = img[obj['ymin']:obj['ymax'], obj['xmin']:obj['xmax'], :]
         # Generate filename
         padding = '0' * (6 - len(str(len(df_metadata_cropped))))
         cropped_filename = Path(f"{padding + str(len(df_metadata_cropped))}.jpg")
+        # Save image
+        try:
+            cv2.imwrite(str(cropped_path / cropped_filename), cropped_image)
+        except Exception as e:
+            print(e)
+            print(f'Error: {im_path} - {obj}')
+            continue
+        # Add metadata
         new_row_cropped_image = dict(
             cropped_image_path=cropped_filename,
             original_path=im_path,
             new_path=filename,
-            category=category
+            brand=brand
         )
         df_metadata_cropped = pd.concat([df_metadata_cropped, pd.DataFrame.from_records([new_row_cropped_image])])
-        # Save image
-        cv2.imwrite(str(cropped_path / cropped_filename), cropped_image)
 
     # Move image
     im_path.rename(images_path.joinpath(filename))
@@ -190,14 +197,14 @@ for i, im_path in tqdm.tqdm(enumerate(all_images), total=len(all_images)):
 np.random.seed(SEED)
 
 # Sample classes
-unique_classes = df_metadata_full['category'].unique()
-np.random.shuffle(unique_classes)
-sampled_classes = unique_classes[:round(sampling_fraction * len(unique_classes))]
+unique_brands = df_metadata_full['brand'].unique()
+np.random.shuffle(unique_brands)
+sampled_classes = unique_brands[:round(sampling_fraction * len(unique_brands))]
 print(f'Number of sampled classes: {len(sampled_classes)} '
-      f'({len(sampled_classes) / len(unique_classes) * 100:.4} %)')
+      f'({len(sampled_classes) / len(unique_brands) * 100:.4} %)')
 
 # Sample instances
-sampled_instances = df_metadata_full[df_metadata_full['category'].isin(sampled_classes)]['new_path'].values
+sampled_instances = df_metadata_full[df_metadata_full['brand'].isin(sampled_classes)]['new_path'].values
 np.random.shuffle(sampled_instances)
 split_ids = [round(len(sampled_instances)*train_split), round(len(sampled_instances)*(train_split + validation_split))]
 training_data, validation_data, test_data = np.split(sampled_instances, split_ids)
