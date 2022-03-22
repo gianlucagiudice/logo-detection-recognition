@@ -99,7 +99,7 @@ def generate_yolo_labels(xml_file_path: Path, obj_class=0):
 def create_dataset_split(split_filename: Path, images) -> None:
     with open(split_filename, 'w') as f:
         np.random.shuffle(images)
-        f.writelines('\n'.join([str(dir_path / DATASET_IMAGES_PATH / x) for x in images]))
+        f.writelines('\n'.join([str(x) for x in images]))
 
 
 # Check if all the files already exists
