@@ -1,14 +1,13 @@
 {
     "prefix": "reproduce",
-    "dataset": "cifar100",
+    "dataset": "LogoDet-3K_cropped",
     "memory_size": 2000,
-    "memory_per_class": 20,
-    "fixed_memory": false,
+    "memory_per_class": 1000,
+    "fixed_memory": true,
     "shuffle": true,
     "init_cls": 10,
     "increment": 10,
     "model_name": "der",
-    "device": "cuda",
-    "convnet_type": "resnet32",
-    "seed": [1993]
+    "convnet_type": "resnet50",
+    "seed": [830694]
 }
