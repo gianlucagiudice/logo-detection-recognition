@@ -144,7 +144,7 @@ all_images = [x for x in get_all_files(original_path) if x.suffix == '.jpg']
 
 # Metadata
 df_metadata_full = pd.DataFrame(columns=['original_path', 'new_path', 'filename', 'category'])
-df_metadata_cropped = pd.DataFrame(columns=['cropped_image_path', 'original_path', 'new_path', 'category'])
+df_metadata_cropped = pd.DataFrame(columns=['cropped_image_path', 'original_path', 'new_path', 'category', 'brand'])
 
 for i, im_path in tqdm.tqdm(enumerate(all_images), total=len(all_images)):
     # Generate new name
@@ -182,7 +182,8 @@ for i, im_path in tqdm.tqdm(enumerate(all_images), total=len(all_images)):
             cropped_image_path=cropped_filename,
             original_path=im_path,
             new_path=filename,
-            brand=brand
+            brand=brand,
+            category=category
         )
         df_metadata_cropped = pd.concat([df_metadata_cropped, pd.DataFrame.from_records([new_row_cropped_image])])
 
