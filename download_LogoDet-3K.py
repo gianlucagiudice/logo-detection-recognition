@@ -221,7 +221,7 @@ if sampling_fraction > 1:
 
 sampled_classes = unique_brands[:round(sampling_fraction * len(unique_brands))]
 print(f'Number of sampled classes: {len(sampled_classes)} '
-      f'({len(sampled_classes) / len(unique_brands) * 100:.4} %)')
+      f'({len(sampled_classes) / len(unique_brands) * 100:.4}%)')
 
 # Sample instances
 sampled_instances = df_metadata_full[df_metadata_full['brand'].isin(sampled_classes)]['new_path'].values
