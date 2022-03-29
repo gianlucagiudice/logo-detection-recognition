@@ -39,6 +39,10 @@ parser.add_argument('--dataset_type', type=str, required=True, default='small',
 parser.add_argument('--sampling_fraction', type=float, required=True, default=1,
                     help='Number of categories to sample.')
 
+
+parser.add_argument('--only-sample', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
+                    help='Number of categories to sample.')
+
 args = parser.parse_args()
 
 type2url = dict(
@@ -109,90 +113,100 @@ if all([
     dir_path.joinpath('validation.txt').exists(),
     images_path.exists(), labels_path.exists(), cropped_path.exists(),
     dir_path.joinpath(METADATA_FULL_IMAGE_PATH).exists(),
-    dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH).exists()
+    dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH).exists(),
+    not args.only_sample
 ]):
     quit(0)
 
-# Reset Directories
-shutil.rmtree(images_path, ignore_errors=True)
-shutil.rmtree(labels_path, ignore_errors=True)
-shutil.rmtree(cropped_path, ignore_errors=True)
-shutil.rmtree(dir_path.joinpath('train.txt'), ignore_errors=True)
-shutil.rmtree(dir_path.joinpath('test.txt'), ignore_errors=True)
-shutil.rmtree(dir_path.joinpath('validation.txt'), ignore_errors=True)
-shutil.rmtree(original_path, ignore_errors=True)
-dir_path.joinpath(METADATA_FULL_IMAGE_PATH).unlink(missing_ok=True)
-dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH).unlink(missing_ok=True)
+
+if args.only_sample:
+    # Read dataframes from file
+    df_metadata_full = pd.read_pickle(str(dir_path.joinpath(METADATA_FULL_IMAGE_PATH)))
+    df_metadata_cropped = pd.read_pickle(str(dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH)))
+else:
+    # Reset Directories
+    shutil.rmtree(images_path, ignore_errors=True)
+    shutil.rmtree(labels_path, ignore_errors=True)
+    shutil.rmtree(cropped_path, ignore_errors=True)
+    shutil.rmtree(dir_path.joinpath('train.txt'), ignore_errors=True)
+    shutil.rmtree(dir_path.joinpath('test.txt'), ignore_errors=True)
+    shutil.rmtree(dir_path.joinpath('validation.txt'), ignore_errors=True)
+    shutil.rmtree(original_path, ignore_errors=True)
+    dir_path.joinpath(METADATA_FULL_IMAGE_PATH).unlink(missing_ok=True)
+    dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH).unlink(missing_ok=True)
+
+    Path.mkdir(Path(DATASET_PATH), exist_ok=True)
+    Path.mkdir(dir_path, exist_ok=True)
+    Path.mkdir(images_path, exist_ok=False)
+    Path.mkdir(labels_path, exist_ok=False)
+    Path.mkdir(cropped_path, exist_ok=False)
+
+    # Download
+    os.system(f"wget -nc '{url_dataset}' -O {dir_path / 'out.zip'}")
+    ZipFile(dir_path / 'out.zip').extractall(path=dir_path)
+
+    # Get all files in a given directory
+    get_all_files = lambda folder_path: [Path(Path(currentpath).joinpath(file))
+                                         for currentpath, folders, files in os.walk(folder_path)
+                                         for file in files]
+    # Read all images
+    all_images = [x for x in get_all_files(original_path) if x.suffix == '.jpg']
+
+    # Metadata
+    df_metadata_full = pd.DataFrame(columns=['original_path', 'new_path', 'filename', 'category'])
+    df_metadata_cropped = pd.DataFrame(columns=['cropped_image_path', 'original_path', 'new_path', 'category', 'brand'])
 
 
-Path.mkdir(Path(DATASET_PATH), exist_ok=True)
-Path.mkdir(dir_path, exist_ok=True)
-Path.mkdir(images_path, exist_ok=False)
-Path.mkdir(labels_path, exist_ok=False)
-Path.mkdir(cropped_path, exist_ok=False)
-
-# Download
-os.system(f"wget -nc '{url_dataset}' -O {dir_path / 'out.zip'}")
-ZipFile(dir_path / 'out.zip').extractall(path=dir_path)
-
-# Get all files in a given directory
-get_all_files = lambda folder_path: [Path(Path(currentpath).joinpath(file))
-                                     for currentpath, folders, files in os.walk(folder_path)
-                                     for file in files]
-# Read all images
-all_images = [x for x in get_all_files(original_path) if x.suffix == '.jpg']
-
-# Metadata
-df_metadata_full = pd.DataFrame(columns=['original_path', 'new_path', 'filename', 'category'])
-df_metadata_cropped = pd.DataFrame(columns=['cropped_image_path', 'original_path', 'new_path', 'category', 'brand'])
-
-for i, im_path in tqdm.tqdm(enumerate(all_images), total=len(all_images)):
-    # Generate new name
-    filename = Path(f"{'0' * (len(str(len(all_images))) - len(str(i)))}{str(i)}.jpg")
-    # Generate label file
-    yolo_label_content, objects, brands, original_filename = generate_yolo_labels(im_path.with_suffix('.xml'))
-    # Add metadata full image
-    *_, category, brand, _ = os.path.normpath(im_path).split(os.path.sep)
-    new_row_full_image = dict(
-        original_path=str(im_path),
-        new_path=str(images_path / filename),
-        filename=original_filename,
-        category=category,
-        brand=brand
-    )
-    df_metadata_full = pd.concat([df_metadata_full, pd.DataFrame.from_records([new_row_full_image])])
-    # Crop all objects
-    img = cv2.imread(str(im_path))
-
-    for brand, obj in zip(brands, objects):
-        # Crop the logo
-        cropped_image = img[obj['ymin']:obj['ymax'], obj['xmin']:obj['xmax'], :]
-        # Generate filename
-        padding = '0' * (6 - len(str(len(df_metadata_cropped))))
-        cropped_filename = Path(f"{padding + str(len(df_metadata_cropped))}.jpg")
-        # Save image
-        try:
-            cv2.imwrite(str(cropped_path / cropped_filename), cropped_image)
-        except Exception as e:
-            print(e)
-            print(f'Error: {im_path} - {obj}')
-            continue
-        # Add metadata
-        new_row_cropped_image = dict(
-            cropped_image_path=cropped_filename,
-            original_path=im_path,
-            new_path=filename,
-            brand=brand,
-            category=category
+    for i, im_path in tqdm.tqdm(enumerate(all_images), total=len(all_images)):
+        # Generate new name
+        filename = Path(f"{'0' * (len(str(len(all_images))) - len(str(i)))}{str(i)}.jpg")
+        # Generate label file
+        yolo_label_content, objects, brands, original_filename = generate_yolo_labels(im_path.with_suffix('.xml'))
+        # Add metadata full image
+        *_, category, brand, _ = os.path.normpath(im_path).split(os.path.sep)
+        new_row_full_image = dict(
+            original_path=str(im_path),
+            new_path=str(images_path / filename),
+            filename=original_filename,
+            category=category,
+            brand=brand
         )
-        df_metadata_cropped = pd.concat([df_metadata_cropped, pd.DataFrame.from_records([new_row_cropped_image])])
+        df_metadata_full = pd.concat([df_metadata_full, pd.DataFrame.from_records([new_row_full_image])])
+        # Crop all objects
+        img = cv2.imread(str(im_path))
 
-    # Move image
-    im_path.rename(images_path.joinpath(filename))
-    # Create file
-    with open(labels_path.joinpath(filename.with_suffix('.txt')), 'w') as f:
-        f.writelines(yolo_label_content)
+        for brand, obj in zip(brands, objects):
+            # Crop the logo
+            cropped_image = img[obj['ymin']:obj['ymax'], obj['xmin']:obj['xmax'], :]
+            # Generate filename
+            padding = '0' * (6 - len(str(len(df_metadata_cropped))))
+            cropped_filename = Path(f"{padding + str(len(df_metadata_cropped))}.jpg")
+            # Save image
+            try:
+                cv2.imwrite(str(cropped_path / cropped_filename), cropped_image)
+            except Exception as e:
+                print(e)
+                print(f'Error: {im_path} - {obj}')
+                continue
+            # Add metadata
+            new_row_cropped_image = dict(
+                cropped_image_path=cropped_filename,
+                original_path=im_path,
+                new_path=filename,
+                brand=brand,
+                category=category
+            )
+            df_metadata_cropped = pd.concat([df_metadata_cropped, pd.DataFrame.from_records([new_row_cropped_image])])
 
+        # Move image
+        im_path.rename(images_path.joinpath(filename))
+        # Create file
+        with open(labels_path.joinpath(filename.with_suffix('.txt')), 'w') as f:
+            f.writelines(yolo_label_content)
+
+    # Export dataframe
+    df_metadata_full.to_pickle(str(dir_path.joinpath(METADATA_FULL_IMAGE_PATH)))
+    df_metadata_cropped.to_pickle(str(dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH)))
 
 # Create train/validation/test
 np.random.seed(SEED)
@@ -200,6 +214,11 @@ np.random.seed(SEED)
 # Sample classes
 unique_brands = df_metadata_full['brand'].unique()
 np.random.shuffle(unique_brands)
+
+# Convert to sampling fraction
+if sampling_fraction > 1:
+    sampling_fraction = sampling_fraction / len(unique_brands)
+
 sampled_classes = unique_brands[:round(sampling_fraction * len(unique_brands))]
 print(f'Number of sampled classes: {len(sampled_classes)} '
       f'({len(sampled_classes) / len(unique_brands) * 100:.4} %)')
@@ -220,9 +239,5 @@ create_dataset_split(dir_path.joinpath('train.txt'), training_data)
 create_dataset_split(dir_path.joinpath('validation.txt'), validation_data)
 create_dataset_split(dir_path.joinpath('test.txt'), test_data)
 
-# Export dataframe
-df_metadata_full.to_pickle(str(dir_path.joinpath(METADATA_FULL_IMAGE_PATH)))
-df_metadata_cropped .to_pickle(str(dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH)))
-
 # Remove old directory
-shutil.rmtree(original_path)
+shutil.rmtree(original_path, ignore_errors=True)
