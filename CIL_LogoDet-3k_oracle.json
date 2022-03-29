@@ -5,7 +5,7 @@
     "memory_per_class": 100,
     "fixed_memory": true,
     "shuffle": true,
-    "init_cls": 30,
+    "init_cls": 110,
     "increment": 10,
     "model_name": "der",
     "convnet_type": "resnet32",
