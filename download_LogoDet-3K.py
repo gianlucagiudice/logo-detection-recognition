@@ -23,24 +23,26 @@ DATASET_ROOT = 'LogoDet-3K'
 parser = argparse.ArgumentParser(description='Download LogoDet-3k.')
 
 
-parser.add_argument('--train_split', type=float, default=DATASET_TRAIN_SPLIT,
+parser.add_argument('--train-split', type=float, default=DATASET_TRAIN_SPLIT,
                     help='Training split ratio.')
 
-parser.add_argument('--validation_split', type=float, default=DATASET_VALIDATION_SPLIT,
+parser.add_argument('--validation-split', type=float, default=DATASET_VALIDATION_SPLIT,
                     help='Validation split ratio.')
 
-parser.add_argument('--test_split', type=float, default=DATASET_TEST_SPLIT,
+parser.add_argument('--test-split', type=float, default=DATASET_TEST_SPLIT,
                     help='Test split ratio.')
 
-parser.add_argument('--dataset_type', type=str, required=True, default='small',
+parser.add_argument('--dataset-type', type=str, required=True, default='small',
                     choices=['small', 'sample', 'normal'],
                     help='Type of LogoDet-3K dataset {small/sample/normal}.')
 
-parser.add_argument('--sampling_fraction', type=float, required=True, default=1,
+parser.add_argument('--sampling-fraction', type=float, required=True, default=1,
                     help='Number of categories to sample.')
 
-
 parser.add_argument('--only-sample', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
+                    help='Number of categories to sample.')
+
+parser.add_argument('--only-top', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Number of categories to sample.')
 
 args = parser.parse_args()
@@ -58,6 +60,8 @@ type2path = dict(
 )
 
 train_split, validation_split, test_split = args.train_split, args.validation_split, args.test_split
+assert sum([train_split, validation_split, test_split]) == 1
+
 url_dataset = type2url[args.dataset_type]
 dir_path = Path(f'{DATASET_PATH}/{type2path[args.dataset_type]}')
 
@@ -213,11 +217,21 @@ np.random.seed(SEED)
 
 # Sample classes
 unique_brands = df_metadata_full['brand'].unique()
-np.random.shuffle(unique_brands)
 
 # Convert to sampling fraction
 if sampling_fraction > 1:
     sampling_fraction = sampling_fraction / len(unique_brands)
+
+if args.only_top:
+    # Consider only the classes with the highest number of sample
+    categories_frequency = df_metadata_full.groupby(by=['brand']).count()['original_path']
+    categories_sorted_by_frequency = list(map(lambda x: x[0],
+                                              sorted(zip(categories_frequency.index, categories_frequency),
+                                                     key=lambda x: x[1], reverse=True)))
+    unique_brands = categories_sorted_by_frequency
+else:
+    # Shuffle the classes randomly
+    np.random.shuffle(unique_brands)
 
 sampled_classes = unique_brands[:round(sampling_fraction * len(unique_brands))]
 print(f'Number of sampled classes: {len(sampled_classes)} '
@@ -233,7 +247,7 @@ print(f'Number of sampled instances: {len(sampled_instances)} '
       f'Training split info: [\n'
       f'\ttraining = {len(training_data)} ({len(training_data) / len(sampled_instances)*100:.4}%);\n'
       f'\tvalidation = {len(validation_data)} ({len(validation_data) / len(sampled_instances)*100:.4}%);\n'
-      f'\ttest = {len(validation_data)} ({len(test_data) / len(sampled_instances) * 100:.4}%)\n]')
+      f'\ttest = {len(test_data)} ({len(test_data) / len(sampled_instances) * 100:.4}%)\n]')
 
 create_dataset_split(dir_path.joinpath('train.txt'), training_data)
 create_dataset_split(dir_path.joinpath('validation.txt'), validation_data)
