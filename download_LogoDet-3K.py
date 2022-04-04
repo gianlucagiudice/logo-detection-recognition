@@ -15,8 +15,6 @@ sys.path.append('./yolov5')
 
 from yolov5.utils.general import Path
 
-SEED = 830694
-
 DATASET_ROOT = 'LogoDet-3K'
 
 
