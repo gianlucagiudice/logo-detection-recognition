@@ -160,7 +160,6 @@ else:
     df_metadata_full = pd.DataFrame(columns=['original_path', 'new_path', 'filename', 'category'])
     df_metadata_cropped = pd.DataFrame(columns=['cropped_image_path', 'original_path', 'new_path', 'category', 'brand'])
 
-
     for i, im_path in tqdm.tqdm(enumerate(all_images), total=len(all_images)):
         # Generate new name
         filename = Path(f"{'0' * (len(str(len(all_images))) - len(str(i)))}{str(i)}.jpg")
@@ -238,16 +237,33 @@ print(f'Number of sampled classes: {len(sampled_classes)} '
       f'({len(sampled_classes) / len(unique_brands) * 100:.4}%)')
 
 # Sample instances
-sampled_instances = df_metadata_full[df_metadata_full['brand'].isin(sampled_classes)]['new_path'].values
-np.random.shuffle(sampled_instances)
-split_ids = [round(len(sampled_instances)*train_split), round(len(sampled_instances)*(train_split + validation_split))]
-training_data, validation_data, test_data = np.split(sampled_instances, split_ids)
-print(f'Number of sampled instances: {len(sampled_instances)} '
-      f'({len(sampled_instances) / len(df_metadata_full) * 100:.4}%)\n'
+subset_df = df_metadata_full[df_metadata_full['brand'].isin(sampled_classes)]
+training_data, validation_data, test_data = [], [], []
+
+for brand in subset_df['brand'].unique():
+    all_brand_instances = subset_df.query(f'brand=="{brand}"')['new_path'].values
+    np.random.shuffle(all_brand_instances)
+    split_ids = [round(len(all_brand_instances) * train_split),
+                 round(len(all_brand_instances) * (train_split + validation_split))]
+    training_brand, validation_brand, test_brand = np.split(all_brand_instances, split_ids)
+    assert len(training_brand) > 0
+    assert len(validation_brand) > 0
+    assert len(test_brand) > 0
+    training_data = training_data + training_brand.tolist()
+    validation_data = validation_data + validation_brand.tolist()
+    test_data = test_data + test_brand.tolist()
+
+np.random.shuffle(training_data)
+np.random.shuffle(validation_data)
+np.random.shuffle(test_data)
+
+
+print(f'Number of sampled instances: {len(subset_df)} '
+      f'({len(subset_df) / len(df_metadata_full) * 100:.4}%)\n'
       f'Training split info: [\n'
-      f'\ttraining = {len(training_data)} ({len(training_data) / len(sampled_instances)*100:.4}%);\n'
-      f'\tvalidation = {len(validation_data)} ({len(validation_data) / len(sampled_instances)*100:.4}%);\n'
-      f'\ttest = {len(test_data)} ({len(test_data) / len(sampled_instances) * 100:.4}%)\n]')
+      f'\ttraining = {len(training_data)} ({len(training_data) / len(subset_df)*100:.4}%);\n'
+      f'\tvalidation = {len(validation_data)} ({len(validation_data) / len(subset_df)*100:.4}%);\n'
+      f'\ttest = {len(test_data)} ({len(test_data) / len(subset_df) * 100:.4}%)\n]')
 
 create_dataset_split(dir_path.joinpath('train.txt'), training_data)
 create_dataset_split(dir_path.joinpath('validation.txt'), validation_data)
