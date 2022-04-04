@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 import torchvision.models
-from pytorch_lightning.utilities.types import TRAIN_DATALOADERS, EVAL_DATALOADERS
+from pytorch_lightning.utilities.types import TRAIN_DATALOADERS, EVAL_DATALOADERS, EPOCH_OUTPUT
 
 from torch.utils.data import DataLoader
 
@@ -22,6 +22,9 @@ import sys
 sys.path.append('pycil')
 from pycil.trainer import _set_random, setup_train_device, print_args
 from pycil.utils.data_manager import DataManager
+
+
+n_epochs = 100
 
 
 class Model(LightningModule):
@@ -52,9 +55,7 @@ class Model(LightningModule):
         _, preds = torch.max(logits, dim=1)
         n_correct = preds.eq(y.expand_as(preds)).cpu().sum()
         train_acc = n_correct / y.size(dim=0)
-        self.log("train_loss", loss)
-        self.log("train acc", train_acc)
-        return loss
+        return dict(loss=loss, train_acc=train_acc)
 
     def validation_step(self, batch, batch_idx):
         _, x, y = batch
@@ -64,8 +65,17 @@ class Model(LightningModule):
         _, preds = torch.max(logits, dim=1)
         n_correct = preds.eq(y.expand_as(preds)).cpu().sum()
         val_acc = n_correct / y.size(dim=0)
-        self.log("val_loss", loss)
-        self.log("train acc", val_acc)
+        return dict(loss=loss, val_acc=val_acc)
+
+    def training_epoch_end(self, outputs: EPOCH_OUTPUT) -> None:
+        last = outputs[-1]
+        self.log("train_loss", last['loss'])
+        self.log("train_acc", last['train_acc'])
+
+    def validation_epoch_end(self, outputs: EPOCH_OUTPUT) -> None:
+        last = outputs[-1]
+        self.log("val_loss", last['loss'])
+        self.log("val_acc", last['val_acc'])
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
@@ -103,7 +113,9 @@ def train(args):
     model = Model(args)
     # Training
     wandb_logger = WandbLogger()
-    trainer = Trainer(log_every_n_steps=1, logger=wandb_logger)
+    trainer = Trainer(
+        log_every_n_steps=1, logger=wandb_logger, accelerator='auto', max_epochs=n_epochs
+    )
     trainer.fit(model)
 
 
