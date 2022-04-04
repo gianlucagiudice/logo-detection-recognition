@@ -8,6 +8,8 @@ import argparse
 import sys
 import cv2
 import tqdm
+import subprocess
+
 
 from config import *
 
@@ -144,7 +146,8 @@ else:
     Path.mkdir(cropped_path, exist_ok=False)
 
     # Download
-    os.system(f"wget -nc '{url_dataset}' -O {dir_path / 'out.zip'}")
+    command = f"wget -nc '{url_dataset}' -O {dir_path / 'out.zip'}"
+    subprocess.run(command, shell=True)
     ZipFile(dir_path / 'out.zip').extractall(path=dir_path)
 
     # Get all files in a given directory
@@ -176,7 +179,7 @@ else:
         # Crop all objects
         img = cv2.imread(str(im_path))
 
-        for brand, obj in zip(brands, objects):
+        for brand_obj, obj in zip(brands, objects):
             # Crop the logo
             cropped_image = img[obj['ymin']:obj['ymax'], obj['xmin']:obj['xmax'], :]
             # Generate filename
@@ -185,19 +188,19 @@ else:
             # Save image
             try:
                 cv2.imwrite(str(cropped_path / cropped_filename), cropped_image)
+                # Add metadata
+                new_row_cropped_image = dict(
+                    cropped_image_path=cropped_filename,
+                    original_path=im_path,
+                    new_path=filename,
+                    brand=brand_obj,
+                    category=category
+                )
+                df_metadata_cropped = pd.concat(
+                    [df_metadata_cropped, pd.DataFrame.from_records([new_row_cropped_image])])
             except Exception as e:
                 print(e)
                 print(f'Error: {im_path} - {obj}')
-                continue
-            # Add metadata
-            new_row_cropped_image = dict(
-                cropped_image_path=cropped_filename,
-                original_path=im_path,
-                new_path=filename,
-                brand=brand,
-                category=category
-            )
-            df_metadata_cropped = pd.concat([df_metadata_cropped, pd.DataFrame.from_records([new_row_cropped_image])])
 
         # Move image
         im_path.rename(images_path.joinpath(filename))
@@ -213,7 +216,7 @@ else:
 np.random.seed(SEED)
 
 # Sample classes
-unique_brands = df_metadata_full['brand'].unique()
+unique_brands = df_metadata_cropped['brand'].unique()
 
 # Convert to sampling fraction
 if sampling_fraction > 1:
@@ -221,7 +224,7 @@ if sampling_fraction > 1:
 
 if args.only_top:
     # Consider only the classes with the highest number of sample
-    categories_frequency = df_metadata_full.groupby(by=['brand']).count()['original_path']
+    categories_frequency = df_metadata_full.groupby(by=['brand']).count()['new_path']
     categories_sorted_by_frequency = list(map(lambda x: x[0],
                                               sorted(zip(categories_frequency.index, categories_frequency),
                                                      key=lambda x: x[1], reverse=True)))
@@ -235,11 +238,11 @@ print(f'Number of sampled classes: {len(sampled_classes)} '
       f'({len(sampled_classes) / len(unique_brands) * 100:.4}%)')
 
 # Sample instances
-subset_df = df_metadata_full[df_metadata_full['brand'].isin(sampled_classes)]
+subset_df = df_metadata_cropped[df_metadata_cropped['brand'].isin(sampled_classes)]
 training_data, validation_data, test_data = [], [], []
 
 for brand in subset_df['brand'].unique():
-    all_brand_instances = subset_df.query(f'brand=="{brand}"')['new_path'].values
+    all_brand_instances = subset_df.query(f'brand=="{brand}"')['cropped_image_path'].values
     np.random.shuffle(all_brand_instances)
     split_ids = [round(len(all_brand_instances) * train_split),
                  round(len(all_brand_instances) * (train_split + validation_split))]
@@ -255,6 +258,10 @@ np.random.shuffle(training_data)
 np.random.shuffle(validation_data)
 np.random.shuffle(test_data)
 
+# Test number of extracted classes
+brand_mask = df_metadata_cropped['cropped_image_path'].isin(training_data + validation_data + test_data)
+extracted_brand =  df_metadata_cropped[brand_mask]['brand'].unique()
+assert extracted_brand.size == round(sampling_fraction * len(unique_brands))
 
 print(f'Number of sampled instances: {len(subset_df)} '
       f'({len(subset_df) / len(df_metadata_full) * 100:.4}%)\n'
