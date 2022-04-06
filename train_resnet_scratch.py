@@ -24,7 +24,7 @@ from pycil.trainer import _set_random, setup_train_device, print_args
 from pycil.utils.data_manager import DataManager
 
 
-n_epochs = 100
+n_epochs = 50
 
 
 class Model(LightningModule):
