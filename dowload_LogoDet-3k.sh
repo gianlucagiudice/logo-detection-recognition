@@ -1,1 +1,0 @@
-python download_LogoDet-3K.py --dataset-type normal --sampling-fraction 30 --only-sample --only-top --train-split 0.70 --validation-split 0.10 --test-split 0.20
