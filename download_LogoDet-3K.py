@@ -45,6 +45,9 @@ parser.add_argument('--only-sample', type=bool, required=False, default=False, a
 parser.add_argument('--only-top', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Number of categories to sample.')
 
+parser.add_argument('--sampling-method', type=str, required=True, choices=['cil', 'detection'],
+                    help='Chose the sampling method according to the learning task.')
+
 args = parser.parse_args()
 
 type2url = dict(
@@ -216,7 +219,9 @@ else:
 np.random.seed(SEED)
 
 # Sample classes
-unique_brands = df_metadata_cropped['brand'].unique()
+df_for_sampling_method = df_metadata_cropped if args.sampling_method == 'cil' else df_metadata_full
+df_path_column = 'cropped_image_path' if args.sampling_method == 'cil' else 'new_path'
+unique_brands = df_for_sampling_method['brand'].unique()
 
 # Convert to sampling fraction
 if sampling_fraction > 1:
@@ -238,14 +243,23 @@ print(f'Number of sampled classes: {len(sampled_classes)} '
       f'({len(sampled_classes) / len(unique_brands) * 100:.4}%)')
 
 # Sample instances
-subset_df = df_metadata_cropped[df_metadata_cropped['brand'].isin(sampled_classes)]
+subset_df = df_for_sampling_method[df_for_sampling_method['brand'].isin(sampled_classes)]
 training_data, validation_data, test_data = [], [], []
 
-for brand in subset_df['brand'].unique():
-    all_brand_instances = subset_df.query(f'brand=="{brand}"')['cropped_image_path'].values
+print('Sampling classes . . .')
+for brand in tqdm.tqdm(subset_df['brand'].unique()):
+    all_brand_instances = subset_df.query(f'brand=="{brand}"')[df_path_column].values
     np.random.shuffle(all_brand_instances)
-    split_ids = [round(len(all_brand_instances) * train_split),
-                 round(len(all_brand_instances) * (train_split + validation_split))]
+    # At least 3 instances
+    assert len(all_brand_instances) >= 3
+    # Compute the split ids
+    id1 = round(len(all_brand_instances) * train_split)
+    id2 = round(len(all_brand_instances) * (train_split + validation_split))
+    # At least one instance in the validation set
+    split_ids = [id1, max(id1 + 1, id2)]
+    # At least one instance in the test set
+    if split_ids[-1] == len(all_brand_instances):
+        split_ids = list(map(lambda x: x-1, split_ids))
     training_brand, validation_brand, test_brand = np.split(all_brand_instances, split_ids)
     assert len(training_brand) > 0
     assert len(validation_brand) > 0
@@ -259,8 +273,8 @@ np.random.shuffle(validation_data)
 np.random.shuffle(test_data)
 
 # Test number of extracted classes
-brand_mask = df_metadata_cropped['cropped_image_path'].isin(training_data + validation_data + test_data)
-extracted_brand =  df_metadata_cropped[brand_mask]['brand'].unique()
+brand_mask = df_for_sampling_method[df_path_column].isin(training_data + validation_data + test_data)
+extracted_brand = df_for_sampling_method[brand_mask]['brand'].unique()
 assert extracted_brand.size == round(sampling_fraction * len(unique_brands))
 
 print(f'Number of sampled instances: {len(subset_df)} '
