@@ -1,30 +1,50 @@
+import logging
 from typing import Optional
 
 import numpy as np
 import torchvision.models
-from pytorch_lightning.utilities.types import TRAIN_DATALOADERS, EVAL_DATALOADERS, EPOCH_OUTPUT
+from pytorch_lightning.utilities.types import EPOCH_OUTPUT, TRAIN_DATALOADERS, EVAL_DATALOADERS
 
 from torch.utils.data import DataLoader
 
 from pytorch_lightning import LightningModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import torch
-import argparse
-import json
 import multiprocessing
 
 from torch.nn import functional as F
 
 import sys
 
+from config import SEED
+
 sys.path.append('pycil')
-from pycil.trainer import _set_random, setup_train_device, print_args
+from pycil.trainer import _set_random, print_args, init_logger
 from pycil.utils.data_manager import DataManager
 
 
-n_epochs = 50
+experiment_args = {
+    "run_name": "resnet152-from_scratch-100_classes",
+    "prefix": "reproduce",
+    "dataset": "LogoDet-3K_cropped",
+    "shuffle": True,
+    "init_cls": 100,
+    "increment": 10,
+    "model_name": "der",
+    "data_augmentation": True,
+    "seed": SEED,
+
+    # Grid search parameters
+    "dropout": 0.5,
+    "convnet_type": None,
+    "pretrained": None,
+
+    # Baseline method?
+    "baseline": True
+}
 
 
 class Model(LightningModule):
@@ -33,19 +53,38 @@ class Model(LightningModule):
         super().__init__()
         # Save args
         self.args = args
+        self.save_hyperparameters(ignore="model")
         # Datamanager
         self.data_manager = None
         # Define network backbone
-        self.save_hyperparameters(ignore="model")
-        self.model_ft = torchvision.models.resnet18(pretrained=True)
-        self.model_ft.fc = torch.nn.Linear(
-            in_features=self.model_ft.fc.in_features,
-            out_features=args['init_cls']
+        self.resnet = torchvision.models.resnet152(pretrained=True)
+        self.dropout = torch.nn.Dropout(self.args['dropout']) if self.args['dropout'] else None
+        self.fc = torch.nn.Linear(
+            in_features=self.resnet.fc.in_features,
+            out_features=self.args['init_cls']
         )
-        assert list(self.model_ft.children())[-1].out_features == args['init_cls']
+        assert self.fc.out_features == args['init_cls']
 
     def forward(self, x):
-        return self.model_ft(x)
+        x = self.resnet.conv1(x)
+        x = self.resnet.bn1(x)
+        x = self.resnet.relu(x)
+        x = self.resnet.maxpool(x)
+
+        x = self.resnet.layer1(x)
+        x = self.resnet.layer2(x)
+        x = self.resnet.layer3(x)
+        x = self.resnet.layer4(x)
+
+        x = self.resnet.avgpool(x)
+        x = torch.flatten(x, 1)
+
+        if self.dropout:
+            x = self.dropout(x)
+
+        x = self.fc(x)
+
+        return x
 
     def training_step(self, batch, batch_idx):
         _, x, y = batch
@@ -83,7 +122,8 @@ class Model(LightningModule):
 
     def setup(self, stage: Optional[str] = None) -> None:
         self.data_manager = DataManager(
-            self.args['dataset'], self.args['shuffle'], self.args['seed'], self.args['init_cls'], self.args['increment']
+            self.args['dataset'], self.args['shuffle'], self.args['seed'],
+            self.args['init_cls'], self.args['increment'], data_augmentation=self.args['data_augmentation']
         )
 
     def _init_dataloader(self, split):
@@ -104,42 +144,35 @@ class Model(LightningModule):
 
 
 def train(args):
-    # Set up training
-    args['device'] = setup_train_device(args)
+    # Init logger
+    init_logger(args, 'pycil/logs')
+    # Set up seed
     _set_random()
     # Print args
     print_args(args)
     # Model
     model = Model(args)
+    logging.info('Network architecture')
+    logging.info(model.resnet)
+    logging.info(model.dropout)
+    logging.info(model.fc)
     # Training
-    wandb_logger = WandbLogger()
     trainer = Trainer(
-        log_every_n_steps=1, logger=wandb_logger, accelerator='auto', max_epochs=n_epochs
+        log_every_n_steps=1, accelerator='auto', max_epochs=150,
+        logger=WandbLogger(
+            project='pycil', name=args['run_name']),
+        callbacks=[
+            EarlyStopping(monitor="val_acc", min_delta=0.00, patience=30,
+                          verbose=True, mode="max")
+        ]
     )
     trainer.fit(model)
 
 
-def load_json(settings_path):
-    with open(settings_path) as data_file:
-        param = json.load(data_file)
-    return param
-
-
-def setup_parser():
-    parser = argparse.ArgumentParser(description='Reproduce of multiple continual learning algorthms.')
-    parser.add_argument('--config', type=str, default='pycil/exps/CIL_LogoDet-3k.json',
-                        help='Json file of settings.')
-    return parser
-
-
-def main():
-    args = setup_parser().parse_args()
-    param = load_json(args.config)
-    args = vars(args)  # Converting argparse Namespace to a dict.
-    args.update(param)  # Add parameters from json
-
+def main(args):
+    # TODO: Multiple dropout
     train(args)
 
 
 if __name__ == '__main__':
-    main()
+    main(experiment_args)
