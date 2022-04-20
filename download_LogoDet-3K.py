@@ -9,6 +9,10 @@ import sys
 import cv2
 import tqdm
 import subprocess
+from config import SEED
+
+# Create train/validation/test
+np.random.seed(SEED)
 
 
 from config import *
@@ -214,9 +218,6 @@ else:
     # Export dataframe
     df_metadata_full.to_pickle(str(dir_path.joinpath(METADATA_FULL_IMAGE_PATH)))
     df_metadata_cropped.to_pickle(str(dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH)))
-
-# Create train/validation/test
-np.random.seed(SEED)
 
 # Sample classes
 df_for_sampling_method = df_metadata_cropped if args.sampling_method == 'cil' else df_metadata_full
