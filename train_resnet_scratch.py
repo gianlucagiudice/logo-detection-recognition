@@ -27,7 +27,7 @@ from pycil.utils.data_manager import DataManager
 
 
 experiment_args = {
-    "run_name": "resnet152-from_scratch-100_classes",
+    "run_name": "BASELINE-FAIR_resnet152-from_scratch-100_classes",
     "prefix": "reproduce",
     "dataset": "LogoDet-3K_cropped",
     "shuffle": True,
