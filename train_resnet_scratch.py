@@ -56,6 +56,8 @@ class Model(LightningModule):
         self.save_hyperparameters(ignore="model")
         # Datamanager
         self.data_manager = None
+        # Best validation
+        self.best_val_acc = 0
         # Define network backbone
         self.resnet = torchvision.models.resnet152(pretrained=True)
         self.dropout = torch.nn.Dropout(self.args['dropout']) if self.args['dropout'] else None
@@ -115,6 +117,10 @@ class Model(LightningModule):
         last = outputs[-1]
         self.log("val_loss", last['loss'])
         self.log("val_acc", last['val_acc'])
+        self.best_val_acc = max(self.best_val_acc, last['val_acc'])
+
+    def on_fit_end(self) -> None:
+        self.logger.log_metrics({'CIL/top1_acc': self.best_val_acc, 'task': 0})
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
@@ -156,11 +162,11 @@ def train(args):
     logging.info(model.resnet)
     logging.info(model.dropout)
     logging.info(model.fc)
+    wandb_logger = WandbLogger(project='pycil', name=args['run_name'])
     # Training
     trainer = Trainer(
         log_every_n_steps=1, accelerator='auto', max_epochs=150,
-        logger=WandbLogger(
-            project='pycil', name=args['run_name']),
+        logger=wandb_logger,
         callbacks=[
             EarlyStopping(monitor="val_acc", min_delta=0.00, patience=30,
                           verbose=True, mode="max")
