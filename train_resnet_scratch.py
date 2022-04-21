@@ -120,7 +120,7 @@ class Model(LightningModule):
         self.best_val_acc = max(self.best_val_acc, last['val_acc'])
 
     def on_fit_end(self) -> None:
-        self.logger.log_metrics({'CIL/top1_acc': self.best_val_acc, 'task': 0})
+        self.logger.log_metrics({'CIL/top1_acc': self.best_val_acc * 100, 'task': 0})
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
