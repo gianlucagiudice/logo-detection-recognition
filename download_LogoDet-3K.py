@@ -108,7 +108,7 @@ def generate_yolo_labels(xml_file_path: Path, obj_class=0):
                      f'{round(obj_hight, 6)}')
     # Extract brands
     brands = [obj['brand'] for obj in objs]
-    return '\n'.join(lines), objs, brands, tree.find('filename').text
+    return lines, objs, brands, tree.find('filename').text
 
 
 def create_dataset_split(split_filename: Path, images) -> None:
@@ -186,7 +186,7 @@ else:
         # Crop all objects
         img = cv2.imread(str(im_path))
 
-        for brand_obj, obj in zip(brands, objects):
+        for brand_obj, obj, yolo_label in zip(brands, objects, yolo_label_content):
             # Crop the logo
             cropped_image = img[obj['ymin']:obj['ymax'], obj['xmin']:obj['xmax'], :]
             # Generate filename
@@ -201,7 +201,8 @@ else:
                     original_path=im_path,
                     new_path=filename,
                     brand=brand_obj,
-                    category=category
+                    category=category,
+                    yolo_label=yolo_label
                 )
                 df_metadata_cropped = pd.concat(
                     [df_metadata_cropped, pd.DataFrame.from_records([new_row_cropped_image])])
@@ -213,7 +214,7 @@ else:
         im_path.rename(images_path.joinpath(filename))
         # Create file
         with open(labels_path.joinpath(filename.with_suffix('.txt')), 'w') as f:
-            f.writelines(yolo_label_content)
+            f.writelines('\n'.join(yolo_label_content))
 
     # Export dataframe
     df_metadata_full.to_pickle(str(dir_path.joinpath(METADATA_FULL_IMAGE_PATH)))
