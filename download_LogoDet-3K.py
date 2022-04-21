@@ -168,6 +168,9 @@ else:
     df_metadata_full = pd.DataFrame(columns=['original_path', 'new_path', 'filename', 'category'])
     df_metadata_cropped = pd.DataFrame(columns=['cropped_image_path', 'original_path', 'new_path', 'category', 'brand'])
 
+    df_metadata_full_parts = []
+    df_metadata_cropped_parts = []
+
     for i, im_path in tqdm.tqdm(enumerate(all_images), total=len(all_images)):
         # Generate new name
         filename = Path(f"{'0' * (len(str(len(all_images))) - len(str(i)))}{str(i)}.jpg")
@@ -216,6 +219,18 @@ else:
         with open(labels_path.joinpath(filename.with_suffix('.txt')), 'w') as f:
             f.writelines('\n'.join(yolo_label_content))
 
+    print('Building metadata dataframe . . .')
+    # Combine dataframes
+    df_metadata_full = pd.concat(
+        [df_metadata_full] +
+        [pd.DataFrame.from_records(record) for record in df_metadata_full_parts]
+    )
+    df_metadata_cropped = pd.concat(
+        [df_metadata_cropped] +
+        [pd.DataFrame.from_records(record) for record in df_metadata_cropped_parts]
+    )
+
+    print('Dumping dataframe . . .')
     # Export dataframe
     df_metadata_full.to_pickle(str(dir_path.joinpath(METADATA_FULL_IMAGE_PATH)))
     df_metadata_cropped.to_pickle(str(dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH)))
