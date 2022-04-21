@@ -164,10 +164,6 @@ else:
     # Read all images
     all_images = [x for x in get_all_files(original_path) if x.suffix == '.jpg']
 
-    # Metadata
-    df_metadata_full = pd.DataFrame(columns=['original_path', 'new_path', 'filename', 'category'])
-    df_metadata_cropped = pd.DataFrame(columns=['cropped_image_path', 'original_path', 'new_path', 'category', 'brand'])
-
     df_metadata_full_parts = []
     df_metadata_cropped_parts = []
 
@@ -185,7 +181,6 @@ else:
             category=category,
             brand=brand
         )
-        df_metadata_full = pd.concat([df_metadata_full, pd.DataFrame.from_records([new_row_full_image])])
         # Crop all objects
         img = cv2.imread(str(im_path))
 
@@ -193,8 +188,8 @@ else:
             # Crop the logo
             cropped_image = img[obj['ymin']:obj['ymax'], obj['xmin']:obj['xmax'], :]
             # Generate filename
-            padding = '0' * (6 - len(str(len(df_metadata_cropped))))
-            cropped_filename = Path(f"{padding + str(len(df_metadata_cropped))}.jpg")
+            padding = '0' * (6 - len(str(len(df_metadata_cropped_parts))))
+            cropped_filename = Path(f"{padding + str(len(df_metadata_cropped_parts))}.jpg")
             # Save image
             try:
                 cv2.imwrite(str(cropped_path / cropped_filename), cropped_image)
@@ -207,11 +202,12 @@ else:
                     category=category,
                     yolo_label=yolo_label
                 )
-                df_metadata_cropped = pd.concat(
-                    [df_metadata_cropped, pd.DataFrame.from_records([new_row_cropped_image])])
+                df_metadata_cropped_parts.append(new_row_cropped_image)
             except Exception as e:
                 print(e)
                 print(f'Error: {im_path} - {obj}')
+
+        df_metadata_full_parts.append(new_row_full_image)
 
         # Move image
         im_path.rename(images_path.joinpath(filename))
@@ -219,19 +215,13 @@ else:
         with open(labels_path.joinpath(filename.with_suffix('.txt')), 'w') as f:
             f.writelines('\n'.join(yolo_label_content))
 
-    print('Building metadata dataframe . . .')
     # Combine dataframes
-    df_metadata_full = pd.concat(
-        [df_metadata_full] +
-        [pd.DataFrame.from_records(record) for record in df_metadata_full_parts]
-    )
-    df_metadata_cropped = pd.concat(
-        [df_metadata_cropped] +
-        [pd.DataFrame.from_records(record) for record in df_metadata_cropped_parts]
-    )
+    print('Building metadata dataframe . . .')
+    df_metadata_full = pd.DataFrame(df_metadata_full_parts)
+    df_metadata_cropped = pd.DataFrame(df_metadata_cropped_parts)
 
-    print('Dumping dataframe . . .')
     # Export dataframe
+    print('Dumping dataframe . . .')
     df_metadata_full.to_pickle(str(dir_path.joinpath(METADATA_FULL_IMAGE_PATH)))
     df_metadata_cropped.to_pickle(str(dir_path.joinpath(METADATA_CROPPED_IMAGE_PATH)))
 
