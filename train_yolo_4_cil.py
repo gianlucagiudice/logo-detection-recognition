@@ -30,7 +30,7 @@ DETECTION4CIL_PATH = 'LogoDet-3K_det4cil'
 
 parser = argparse.ArgumentParser(description='Train yolo detector for CIL.')
 
-parser.add_argument('--num_class', type=int, required=True,
+parser.add_argument('--num-class', type=int, required=True,
                     help='Number of classes to use for training.')
 
 parser.add_argument('--only-det', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
