@@ -36,6 +36,9 @@ parser.add_argument('--num-class', type=int, required=True,
 parser.add_argument('--only-det', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Number of classes to use for training.')
 
+parser.add_argument('--start-training', type=bool, required=True, default=False, action=argparse.BooleanOptionalAction,
+                    help='Start the training of the model.')
+
 cmd_args = parser.parse_args()
 
 args = {
@@ -175,7 +178,9 @@ def main():
               f'--name {run_name}'
 
     print(command)
-    subprocess.run(command, shell=True)
+    
+    if cmd_args.start_training:
+        subprocess.run(command, shell=True)
 
 
 if __name__ == '__main__':
