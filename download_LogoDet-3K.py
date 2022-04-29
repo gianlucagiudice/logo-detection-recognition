@@ -185,6 +185,8 @@ else:
         img = cv2.imread(str(im_path))
 
         for brand_obj, obj, yolo_label in zip(brands, objects, yolo_label_content):
+            # Native label
+            x1, y1, x2, y2 = obj['xmin'], obj['ymin'], obj['xmax'], obj['ymax']
             # Crop the logo
             cropped_image = img[obj['ymin']:obj['ymax'], obj['xmin']:obj['xmax'], :]
             # Generate filename
@@ -200,7 +202,8 @@ else:
                     new_path=filename,
                     brand=brand_obj,
                     category=category,
-                    yolo_label=yolo_label
+                    yolo_label=yolo_label,
+                    native_label=(x1, y1, x2, y2)
                 )
                 df_metadata_cropped_parts.append(new_row_cropped_image)
             except Exception as e:
