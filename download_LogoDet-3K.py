@@ -1,31 +1,28 @@
+import argparse
 import os
 import shutil
-import xml.etree.ElementTree as ET
-from zipfile import ZipFile
-import pandas as pd
-import numpy as np
-import argparse
-import sys
-import cv2
-import tqdm
 import subprocess
+import warnings
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from zipfile import ZipFile
+
+import cv2
+import numpy as np
+import pandas as pd
+import tqdm
+
+from config import *
 from config import SEED
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Create train/validation/test
 np.random.seed(SEED)
 
-
-from config import *
-
-sys.path.append('./yolov5')
-
-from yolov5.utils.general import Path
-
 DATASET_ROOT = 'LogoDet-3K'
 
-
 parser = argparse.ArgumentParser(description='Download LogoDet-3k.')
-
 
 parser.add_argument('--train-split', type=float, default=DATASET_TRAIN_SPLIT,
                     help='Training split ratio.')
@@ -48,6 +45,9 @@ parser.add_argument('--only-sample', type=bool, required=False, default=False, a
 
 parser.add_argument('--only-top', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Number of categories to sample.')
+
+parser.add_argument('--optimize', type=bool, required=False, default=True, action=argparse.BooleanOptionalAction,
+                    help='Optimize dataframe creation.')
 
 parser.add_argument('--sampling-method', type=str, required=True, choices=['cil', 'detection'],
                     help='Chose the sampling method according to the learning task.')
@@ -165,6 +165,8 @@ else:
     all_images = [x for x in get_all_files(original_path) if x.suffix == '.jpg']
     all_images = sorted(all_images)
 
+    df_metadata_full, df_metadata_cropped = pd.DataFrame(), pd.DataFrame()
+
     df_metadata_full_parts = []
     df_metadata_cropped_parts = []
 
@@ -206,13 +208,18 @@ else:
                     yolo_label=yolo_label,
                     native_label=(x1, y1, x2, y2)
                 )
-                df_metadata_cropped_parts.append(new_row_cropped_image)
+                if args.optimize:
+                    df_metadata_cropped_parts.append(new_row_cropped_image)
+                else:
+                    df_metadata_cropped = df_metadata_cropped.append(new_row_cropped_image, ignore_index=True)
             except Exception as e:
                 print(e)
                 print(f'Error: {im_path} - {obj}')
 
-        df_metadata_full_parts.append(new_row_full_image)
-
+        if args.optimize:
+            df_metadata_full_parts.append(new_row_full_image)
+        else:
+            df_metadata_full = df_metadata_full.append(new_row_full_image, ignore_index=True)
         # Move image
         im_path.rename(images_path.joinpath(filename))
         # Create file
@@ -221,8 +228,12 @@ else:
 
     # Combine dataframes
     print('Building metadata dataframe . . .')
-    df_metadata_full = pd.DataFrame(df_metadata_full_parts)
-    df_metadata_cropped = pd.DataFrame(df_metadata_cropped_parts)
+    if args.optimize:
+        df_metadata_full = pd.DataFrame(df_metadata_full_parts)
+        df_metadata_cropped = pd.DataFrame(df_metadata_cropped_parts)
+
+    df_metadata_full = df_metadata_full.sort_values(by='original_path')
+    df_metadata_cropped = df_metadata_cropped.sort_values(by='original_path')
 
     # Export dataframe
     print('Dumping dataframe . . .')
