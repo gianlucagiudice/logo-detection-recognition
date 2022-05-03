@@ -163,6 +163,7 @@ else:
                                          for file in files]
     # Read all images
     all_images = [x for x in get_all_files(original_path) if x.suffix == '.jpg']
+    all_images = sorted(all_images)
 
     df_metadata_full_parts = []
     df_metadata_cropped_parts = []
@@ -231,7 +232,7 @@ else:
 # Sample classes
 df_for_sampling_method = df_metadata_cropped if args.sampling_method == 'cil' else df_metadata_full
 df_path_column = 'cropped_image_path' if args.sampling_method == 'cil' else 'new_path'
-unique_brands = df_for_sampling_method['brand'].unique()
+unique_brands = sorted(df_for_sampling_method['brand'].unique())
 
 # Convert to sampling fraction
 if sampling_fraction > 1:
