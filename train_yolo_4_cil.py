@@ -34,7 +34,7 @@ parser.add_argument('--num-class', type=int, required=True,
                     help='Number of classes to use for training.')
 
 parser.add_argument('--only-det', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
-                    help='Number of classes to use for training.')
+                    help='Generate files before detection.')
 
 parser.add_argument('--start-training', type=bool, required=True, default=False, action=argparse.BooleanOptionalAction,
                     help='Start the training of the model.')
@@ -50,10 +50,11 @@ args = {
     "seed": SEED,
 
     # Training
-    "img_size": 512,
-    'batch_size': 32,
-    "epochs": 30,
+    "img_size": 640,
+    'batch_size': 64,
+    "epochs": 40,
     "weights": 'yolov5m6.pt',
+    "adam": True
 }
 
 
@@ -166,7 +167,7 @@ def main():
 
     # Start training
     project = f'yolo-cil'
-    run_name = f"yolo-CIL-{args['init_cls']}cls"
+    run_name = f"yolo-CIL-"
 
     command = f'python yolov5/train.py ' \
               f'--data {yaml_filename} ' \
@@ -176,6 +177,11 @@ def main():
               f'--weights yolov5/{args["weights"]} ' \
               f'--project {project} ' \
               f'--name {run_name}'
+
+    if args['adam']:
+        run_name += 'adam-'
+        command += ' --optimizer Adam'
+    run_name += f"{args['init_cls']}cls"
 
     print(command)
     
