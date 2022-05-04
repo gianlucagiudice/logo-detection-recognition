@@ -2,7 +2,6 @@ import argparse
 import os
 import shutil
 import subprocess
-import warnings
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from zipfile import ZipFile
@@ -14,8 +13,6 @@ import tqdm
 
 from config import *
 from config import SEED
-
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Create train/validation/test
 np.random.seed(SEED)
@@ -211,7 +208,8 @@ else:
                 if args.optimize:
                     df_metadata_cropped_parts.append(new_row_cropped_image)
                 else:
-                    df_metadata_cropped = df_metadata_cropped.append(new_row_cropped_image, ignore_index=True)
+                    new_df = pd.DataFrame([new_row_cropped_image])
+                    df_metadata_cropped = pd.concat([df_metadata_cropped, new_df], ignore_index=True)
             except Exception as e:
                 print(e)
                 print(f'Error: {im_path} - {obj}')
@@ -219,7 +217,8 @@ else:
         if args.optimize:
             df_metadata_full_parts.append(new_row_full_image)
         else:
-            df_metadata_full = df_metadata_full.append(new_row_full_image, ignore_index=True)
+            new_df = pd.DataFrame([new_row_full_image])
+            df_metadata_full = pd.concat([df_metadata_full, new_df], ignore_index=True)
         # Move image
         im_path.rename(images_path.joinpath(filename))
         # Create file
