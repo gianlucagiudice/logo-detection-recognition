@@ -174,7 +174,7 @@ def run(
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # Init logger
-    LOGGER = init_logger(save_dir / 'log.log')
+    LOGGER = init_logger(save_dir / 'detection_results.log')
 
     # Load model
     model = DetectMultiBackend(ROOT / yolo_model_path, device=device, dnn=dnn, data=data, fp16=half)
@@ -321,7 +321,7 @@ def run(
             callbacks.run('on_val_image_end', pred, predn, path, cil_idx2class, im[si])
 
         # Plot images
-        if plots:
+        if plots and batch_i < 10:
             f = save_dir / f'val_batch{batch_i}_labels.jpg'  # labels
             Thread(target=plot_images, args=(im, targets, paths, f, cil_idx2class), daemon=True).start()
             f = save_dir / f'val_batch{batch_i}_pred.jpg'  # predictions
