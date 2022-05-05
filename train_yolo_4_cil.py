@@ -169,7 +169,10 @@ def main():
 
     # Start training
     project = f'yolo-cil'
-    run_name = f"yolo-CIL-"
+    run_name = "yolo-CIL-{}{}".format(
+        'adam-' if args['adam'] else '',
+        f"{args['init_cls']}cls"
+    )
 
     command = f'python yolov5/train.py ' \
               f'--data {yaml_filename} ' \
@@ -181,9 +184,7 @@ def main():
               f'--name {run_name}'
 
     if args['adam']:
-        run_name += 'adam-'
         command += ' --optimizer Adam'
-    run_name += f"{args['init_cls']}cls"
 
     print(command)
     
