@@ -45,6 +45,10 @@ parser.add_argument('--custom-hyper', type=bool, required=False, default=False, 
 parser.add_argument('--adam', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Use adam optimizer.')
 
+parser.add_argument('--lr', type=float, required=False, default=0.001, help='Learning rate.')
+
+parser.add_argument('--num-epochs', type=int, required=False, default=30, help='Number of training epochs')
+
 cmd_args = parser.parse_args()
 
 args = {
@@ -60,14 +64,14 @@ args = {
     # Training
     "img_size": 512,
     'batch_size': 32,
-    "epochs": 50,
+    "epochs": cmd_args.num_epochs,
     "weights": 'yolov5m6.pt',
     "adam": cmd_args.adam
 }
 
 # Training hyperparameter
 hyperparameter_dict = {
-    'lr0': 0.001,  # initial learning rate (SGD=1E-2, Adam=1E-3)
+    'lr0': cmd_args.lr,  # initial learning rate (SGD=1E-2, Adam=1E-3)
     'lrf': 1,  # final OneCycleLR learning rate (lr0 * lrf)
     'momentum': 0.9,  # Adam beta1
     'weight_decay': 0,  # optimizer weight decay
@@ -121,6 +125,7 @@ def init_folders():
     for file in ['train.txt', 'validation.txt', 'test.txt']:
         file_path = Path(DATASET_PATH) / DETECTION4CIL_PATH / file
         file_path.unlink(missing_ok=True)
+        file_path.with_suffix('.cache').unlink(missing_ok=True)
 
 
 def read_metadata():
@@ -209,8 +214,9 @@ def main():
 
     # Start training
     project = f'yolo-cil'
-    run_name = "yolo-CIL-{}{}".format(
+    run_name = "yolo-CIL-{}{}{}".format(
         'adam-' if args['adam'] else '',
+        f'lr{cmd_args.lr}-',
         f"{args['total_cls']}cls"
     )
 
