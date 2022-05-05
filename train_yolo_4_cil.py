@@ -42,6 +42,9 @@ parser.add_argument('--start-training', type=bool, required=True, default=False,
 parser.add_argument('--custom-hyper', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Use custom hyper-parameters.')
 
+parser.add_argument('--adam', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
+                    help='Use adam optimizer.')
+
 cmd_args = parser.parse_args()
 
 args = {
@@ -58,13 +61,13 @@ args = {
     "img_size": 512,
     'batch_size': 32,
     "epochs": 50,
-    "weights": 'yolov5s6.pt',
-    "adam": False
+    "weights": 'yolov5m6.pt',
+    "adam": cmd_args.adam
 }
 
 # Training hyperparameter
 hyperparameter_dict = {
-    'lr0': 0.01,  # initial learning rate (SGD=1E-2, Adam=1E-3)
+    'lr0': 0.001,  # initial learning rate (SGD=1E-2, Adam=1E-3)
     'lrf': 1,  # final OneCycleLR learning rate (lr0 * lrf)
     'momentum': 0.9,  # Adam beta1
     'weight_decay': 0,  # optimizer weight decay
