@@ -44,10 +44,12 @@ cmd_args = parser.parse_args()
 args = {
     "dataset": "LogoDet-3K_cropped",
     "shuffle": True,
-    "init_cls": cmd_args.num_class,
+    "init_cls": 30,
     "increment": 10,
     "data_augmentation": True,
     "seed": SEED,
+
+    "total_cls": cmd_args.num_class,
 
     # Training
     "img_size": 640,
@@ -94,9 +96,9 @@ def init_dataset():
         args['increment'], data_augmentation=args['data_augmentation']
     )
 
-    train = data_manager.get_dataset(indices=np.arange(0, args['init_cls']), source='train', mode='train')
-    validation = data_manager.get_dataset(indices=np.arange(0, args['init_cls']), source='val', mode='test')
-    test = data_manager.get_dataset(indices=np.arange(0, args['init_cls']), source='test', mode='test')
+    train = data_manager.get_dataset(indices=np.arange(0, args['total_cls']), source='train', mode='train')
+    validation = data_manager.get_dataset(indices=np.arange(0, args['total_cls']), source='val', mode='test')
+    test = data_manager.get_dataset(indices=np.arange(0, args['total_cls']), source='test', mode='test')
 
     return train, validation, test
 
