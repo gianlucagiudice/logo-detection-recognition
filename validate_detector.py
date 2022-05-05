@@ -46,7 +46,11 @@ def load_cil_model(cil_model_path):
     # Eval mode
     cil_model.eval()
 
-    return cil_model
+    n_classes = len(model_dict['class_remap'])
+    assert len(model_dict['cil_class2idx']) == n_classes
+    assert len(model_dict['cil_idx2class']) == n_classes
+
+    return cil_model, model_dict['cil_idx2class'], model_dict['cil_class2idx'],  model_dict['cil_prediction2folder']
 
 
 def load_cil_image(path, xyxy):
@@ -79,13 +83,6 @@ def resolve_labels(labelsn, cropped2metadata, full2cropped_list, names2id, paths
         # Get the nearest label
         d = torch.tensor([((yolo - gt) ** 2).sum() for gt in labels_gt])
         resolved = d.argmin().item()
-
-        # TODO: Remove
-        # Distance should be 0
-        if d[resolved] > 2:
-            print('ocioo OOO')
-            print(d[resolved])
-
         # Resolve labels
         resolved_labels[i] = names2id[brands_gt[resolved]]
         # Remove the resolved label
@@ -196,12 +193,11 @@ def run(
     data = check_dataset(data)  # check
 
     # Configure
-    cil_model = load_cil_model(ROOT / opt.cil_model_path)
+    cil_model, cil_idx2class, cil_class2idx, cil_class_remap = load_cil_model(ROOT / opt.cil_model_path)
     model.eval()
     cuda = device.type != 'cpu'
 
     if single_cls:
-        unique_classes = {'logo'}
         nc = 1
     else:
         (metadata_test_dict, cropped2metadata,
@@ -209,6 +205,7 @@ def run(
 
         # Unique classes
         unique_classes = {cropped2metadata[cropped]['brand'] for cropped in all_cropped_test}
+        assert len(unique_classes) == len(cil_class_remap)
         nc = len(unique_classes)
 
     print(f'Number of unique classes: {nc}')
@@ -234,8 +231,6 @@ def run(
 
     seen = 0
     confusion_matrix = ConfusionMatrix(nc=nc, conf=conf_thres)
-    names = {k: v for k, v in enumerate(unique_classes)}
-    names2id = {v: k for k, v in names.items()}
     s = ('%30s' + '%11s' * 6) % ('Class', 'Images', 'Labels', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
     dt, p, r, f1, mp, mr, map50, map = [0.0, 0.0, 0.0], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     loss = torch.zeros(3, device=device)
@@ -267,7 +262,7 @@ def run(
         targets[:, 2:] *= torch.tensor((width, height, width, height), device=device)  # to pixels
         lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
         t3 = time_sync()
-        out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=single_cls)
+        out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=True)
         dt[2] += time_sync() - t3
 
         # Metrics
@@ -298,7 +293,8 @@ def run(
 
                 if not single_cls:
                     # Resolve labels
-                    resolved_labels = resolve_labels(labelsn, cropped2metadata, full2cropped_list, names2id, paths, si)
+                    resolved_labels = resolve_labels(
+                        labelsn, cropped2metadata, full2cropped_list, cil_class2idx, paths, si)
                     # Assign resolved labels
                     labelsn[:, 0:1] = resolved_labels
 
@@ -306,9 +302,10 @@ def run(
                     predictions = torch.zeros(predn.shape[0], 1)
                     for i, prediction in enumerate(predn):
                         xyxy = prediction[:4]
-                        cil_img = load_cil_image(paths[si], xyxy)
-                        cil_prediction = cil_model(cil_img.expand(1, *cil_img.shape))
-                        predictions[i] = cil_prediction['logits'].argmax()
+                        img = load_cil_image(paths[si], xyxy)
+                        cil_prediction = cil_model(img.expand(1, *img.shape))
+                        logit_argmax = cil_prediction['logits'].argmax().int().item()
+                        predictions[i] = cil_class_remap[logit_argmax]
 
                     predn[:, 5:6] = predictions
 
@@ -321,21 +318,21 @@ def run(
             labels[:, 0] = labelsn[:, 0]
             stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
 
-            callbacks.run('on_val_image_end', pred, predn, path, names, im[si])
+            callbacks.run('on_val_image_end', pred, predn, path, cil_idx2class, im[si])
 
         # Plot images
         if plots:
             f = save_dir / f'val_batch{batch_i}_labels.jpg'  # labels
-            Thread(target=plot_images, args=(im, targets, paths, f, names), daemon=True).start()
+            Thread(target=plot_images, args=(im, targets, paths, f, cil_idx2class), daemon=True).start()
             f = save_dir / f'val_batch{batch_i}_pred.jpg'  # predictions
-            Thread(target=plot_images, args=(im, output_to_target(out), paths, f, names), daemon=True).start()
+            Thread(target=plot_images, args=(im, output_to_target(out), paths, f, cil_idx2class), daemon=True).start()
 
         callbacks.run('on_val_batch_end')
 
     # Compute metrics
     stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*stats)]  # to numpy
     if len(stats) and stats[0].any():
-        tp, fp, p, r, f1, ap, ap_class = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names)
+        tp, fp, p, r, f1, ap, ap_class = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=cil_idx2class)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
         nt = np.bincount(stats[3].astype(np.int64), minlength=nc)  # number of targets per class
@@ -349,7 +346,7 @@ def run(
     # Print results per class
     if len(stats) and nc > 1:
         for i, c in enumerate(ap_class):
-            LOGGER.info(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
+            LOGGER.info(pf % (cil_idx2class[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
 
     # Print speeds
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
@@ -359,7 +356,7 @@ def run(
 
     # Plots
     if plots:
-        confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
+        confusion_matrix.plot(save_dir=save_dir, names=list(cil_idx2class.values()))
         callbacks.run('on_val_end')
 
     # Return results
@@ -379,14 +376,14 @@ def run(
         'map': map,
         'ap_classes': maps,
         'times': t,
-        'id2name': names
+        'id2name': cil_idx2class
     }
 
     path = save_dir / 'validation.pickle'
     with open(path, 'wb') as handle:
         pickle.dump(res_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    return (mp, mr, map50, map), maps, t, names
+    return (mp, mr, map50, map), maps, t, cil_idx2class
 
 
 def parse_opt():
@@ -408,7 +405,7 @@ def parse_opt():
     # Other
     parser.add_argument('--batch-size', type=int, default=32, help='batch size')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--workers', type=int, default=8, help='max dataloader workers (per RANK in DDP mode)')
+    parser.add_argument('--workers', type=int, default=0, help='max dataloader workers (per RANK in DDP mode)')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
 
