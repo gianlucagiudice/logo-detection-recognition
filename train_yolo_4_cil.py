@@ -39,6 +39,9 @@ parser.add_argument('--only-det', type=bool, required=False, default=False, acti
 parser.add_argument('--start-training', type=bool, required=True, default=False, action=argparse.BooleanOptionalAction,
                     help='Start the training of the model.')
 
+parser.add_argument('--custom-hyper', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
+                    help='Use custom hyper-parameters.')
+
 cmd_args = parser.parse_args()
 
 args = {
@@ -56,7 +59,7 @@ args = {
     'batch_size': 32,
     "epochs": 40,
     "weights": 'yolov5s6.pt',
-    "adam": True
+    "adam": False
 }
 
 # Training hyperparameter
@@ -201,10 +204,6 @@ def main():
             file
         )
 
-    yaml_hyperparameter = 'logo_detector-hyperparameter.yaml'
-    with open(ROOT / yaml_hyperparameter, 'w') as file:
-        yaml.dump(hyperparameter_dict, file)
-
     # Start training
     project = f'yolo-cil'
     run_name = "yolo-CIL-{}{}".format(
@@ -218,9 +217,16 @@ def main():
               f'--batch {args["batch_size"]} ' \
               f'--epochs {args["epochs"]} ' \
               f'--weights yolov5/{args["weights"]} ' \
-              f'--hyp {yaml_hyperparameter} ' \
               f'--project {project} ' \
               f'--name {run_name}'
+
+    if args['custom_hyper']:
+        # Create yaml file
+        yaml_hyperparameter = 'logo_detector-hyperparameter.yaml'
+        with open(ROOT / yaml_hyperparameter, 'w') as file:
+            yaml.dump(hyperparameter_dict, file)
+        # Add flag to script
+        command += f' --hyp {yaml_hyperparameter}'
 
     if args['adam']:
         command += ' --optimizer Adam'
