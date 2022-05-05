@@ -55,7 +55,7 @@ args = {
     "total_cls": cmd_args.num_class,
 
     # Training
-    "img_size": 512,
+    "img_size": 640,
     'batch_size': 32,
     "epochs": 40,
     "weights": 'yolov5s6.pt',
