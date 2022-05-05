@@ -167,6 +167,21 @@ def main():
             file
         )
 
+    yaml_hyperparameter = 'logo_detector-hyperparameter.yaml'
+    with open(ROOT / yaml_hyperparameter, 'w') as file:
+        yaml.dump(
+            {
+                'lr0': 0.001,  # initial learning rate (SGD=1E-2, Adam=1E-3)
+                'lrf': 1,  # final OneCycleLR learning rate (lr0 * lrf)
+                'momentum': 0.9,  # Adam beta1
+                'weight_decay': 0,  # optimizer weight decay
+                'warmup_epochs': 3.0,  # warmup epochs (fractions ok)
+                'warmup_momentum': 0,  # warmup initial momentum
+                'warmup_bias_lr': 0.001,  # warmup initial bias lr
+            },
+            file
+        )
+
     # Start training
     project = f'yolo-cil'
     run_name = "yolo-CIL-{}{}".format(
@@ -180,6 +195,7 @@ def main():
               f'--batch {args["batch_size"]} ' \
               f'--epochs {args["epochs"]} ' \
               f'--weights yolov5/{args["weights"]} ' \
+              f'--hyp {yaml_hyperparameter} ' \
               f'--project {project} ' \
               f'--name {run_name}'
 
