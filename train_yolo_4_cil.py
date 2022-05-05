@@ -59,6 +59,40 @@ args = {
     "adam": True
 }
 
+# Training hyperparameter
+hyperparameter_dict = {
+    'lr0': 0.001,  # initial learning rate (SGD=1E-2, Adam=1E-3)
+    'lrf': 1,  # final OneCycleLR learning rate (lr0 * lrf)
+    'momentum': 0.9,  # Adam beta1
+    'weight_decay': 0,  # optimizer weight decay
+    'warmup_epochs': 3.0,  # warmup epochs (fractions ok)
+    'warmup_momentum': 0,  # warmup initial momentum
+    'warmup_bias_lr': 0.001,  # warmup initial bias lr
+
+    # Default
+    'box': 0.05,
+    'cls': 0.5,
+    'cls_pw': 1.0,
+    'obj': 1.0,
+    'obj_pw': 1.0,
+    'iou_t': 0.2,
+    'anchor_t': 4.0,
+    'fl_gamma': 0.0,
+    'hsv_h': 0.015,
+    'hsv_s': 0.7,
+    'hsv_v': 0.4,
+    'degrees': 0.0,
+    'translate': 0.1,
+    'scale': 0.5,
+    'shear': 0.0,
+    'perspective': 0.0,
+    'flipud': 0.0,
+    'fliplr': 0.5,
+    'mosaic': 1.0,
+    'mixup': 0.0,
+    'copy_paste': 0.0
+}
+
 
 def init_folders():
     # Create directory
@@ -169,18 +203,7 @@ def main():
 
     yaml_hyperparameter = 'logo_detector-hyperparameter.yaml'
     with open(ROOT / yaml_hyperparameter, 'w') as file:
-        yaml.dump(
-            {
-                'lr0': 0.001,  # initial learning rate (SGD=1E-2, Adam=1E-3)
-                'lrf': 1,  # final OneCycleLR learning rate (lr0 * lrf)
-                'momentum': 0.9,  # Adam beta1
-                'weight_decay': 0,  # optimizer weight decay
-                'warmup_epochs': 3.0,  # warmup epochs (fractions ok)
-                'warmup_momentum': 0,  # warmup initial momentum
-                'warmup_bias_lr': 0.001,  # warmup initial bias lr
-            },
-            file
-        )
+        yaml.dump(hyperparameter_dict, file)
 
     # Start training
     project = f'yolo-cil'
