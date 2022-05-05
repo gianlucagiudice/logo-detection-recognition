@@ -61,7 +61,7 @@ args = {
 
 # Training hyperparameter
 hyperparameter_dict = {
-    'lr0': 0.001,  # initial learning rate (SGD=1E-2, Adam=1E-3)
+    'lr0': 0.01,  # initial learning rate (SGD=1E-2, Adam=1E-3)
     'lrf': 1,  # final OneCycleLR learning rate (lr0 * lrf)
     'momentum': 0.9,  # Adam beta1
     'weight_decay': 0,  # optimizer weight decay
