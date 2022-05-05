@@ -57,7 +57,7 @@ args = {
     # Training
     "img_size": 512,
     'batch_size': 32,
-    "epochs": 40,
+    "epochs": 50,
     "weights": 'yolov5s6.pt',
     "adam": False
 }
