@@ -220,7 +220,7 @@ def main():
               f'--project {project} ' \
               f'--name {run_name}'
 
-    if args['custom_hyper']:
+    if cmd_args.custom_hyper:
         # Create yaml file
         yaml_hyperparameter = 'logo_detector-hyperparameter.yaml'
         with open(ROOT / yaml_hyperparameter, 'w') as file:
