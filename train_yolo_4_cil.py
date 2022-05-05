@@ -55,7 +55,7 @@ args = {
     "img_size": 640,
     'batch_size': 32,
     "epochs": 40,
-    "weights": 'yolov5m6.pt',
+    "weights": 'yolov5s6.pt',
     "adam": True
 }
 
@@ -171,7 +171,7 @@ def main():
     project = f'yolo-cil'
     run_name = "yolo-CIL-{}{}".format(
         'adam-' if args['adam'] else '',
-        f"{args['init_cls']}cls"
+        f"{args['total_cls']}cls"
     )
 
     command = f'python yolov5/train.py ' \
