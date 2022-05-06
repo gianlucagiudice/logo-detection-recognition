@@ -15,6 +15,9 @@ import os
 
 import yaml
 
+import itertools
+
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
@@ -55,6 +58,12 @@ parser.add_argument('--num-epochs', type=int, required=False, default=30, help='
 
 parser.add_argument('--img-size', type=int, required=False, default=512, help='Image size.')
 
+parser.add_argument('--batch', type=int, required=False, default=32, help='Batch size.')
+
+yolo_sizes = [f'YOLOv5{size}{version}' for size, version in itertools.product(['s', 'm', 'l'], ['', '6'])]
+parser.add_argument('--yolo-size', type=str, required=False, default='yolov5m6',
+                    choices=yolo_sizes + list(map(lambda x: x.lower(), yolo_sizes)),
+                    help='Yolo model size.')
 
 cmd_args = parser.parse_args()
 
@@ -70,9 +79,9 @@ args = {
 
     # Training
     "img_size": cmd_args.img_size,
-    'batch_size': 32,
+    'batch_size': cmd_args.batch,
     "epochs": cmd_args.num_epochs,
-    "weights": 'yolov5m6.pt',
+    "weights": f'{cmd_args.yolo_size}.pt',
     "adam": cmd_args.adam
 }
 
@@ -221,7 +230,8 @@ def main():
 
     # Start training
     project = f'yolo-cil'
-    run_name = "yolo-CIL-{}{}{}".format(
+    run_name = "{}-CIL-{}{}{}".format(
+        cmd_args.yolo_size,
         'adam-' if args['adam'] else '',
         f'lr{cmd_args.lr}-',
         f"{args['total_cls']}cls"
