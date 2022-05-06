@@ -233,7 +233,7 @@ def main():
     run_name = "{}-CIL-{}{}{}".format(
         cmd_args.yolo_size,
         'adam-' if args['adam'] else '',
-        f'lr{cmd_args.lr}-',
+        f'lr{cmd_args.lr}-' if cmd_args.custom_hyper else '',
         f"{args['total_cls']}cls"
     )
 
