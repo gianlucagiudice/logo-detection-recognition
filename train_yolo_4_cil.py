@@ -49,6 +49,8 @@ parser.add_argument('--lr', type=float, required=False, default=0.001, help='Lea
 
 parser.add_argument('--num-epochs', type=int, required=False, default=30, help='Number of training epochs')
 
+parser.add_argument('--img-size', type=int, required=False, default=512, help='Image size.')
+
 cmd_args = parser.parse_args()
 
 args = {
@@ -62,7 +64,7 @@ args = {
     "total_cls": cmd_args.num_class,
 
     # Training
-    "img_size": 512,
+    "img_size": cmd_args.img_size,
     'batch_size': 32,
     "epochs": cmd_args.num_epochs,
     "weights": 'yolov5m6.pt',
