@@ -230,15 +230,17 @@ def main():
 
     # Start training
     project = f'yolo-cil'
-    run_name = "{}-CIL-{}{}{}".format(
+    run_name = "{}-CIL-{}{}{}{}".format(
         cmd_args.yolo_size,
         'adam-' if args['adam'] else '',
         f'lr{cmd_args.lr}-' if cmd_args.custom_hyper else '',
+        f'{args["img_size"]}px-',
         f"{args['total_cls']}cls"
     )
 
     command = f'python yolov5/train.py ' \
               f'--data {yaml_filename} ' \
+              f'--single-cls ' \
               f'--img {args["img_size"]} ' \
               f'--batch {args["batch_size"]} ' \
               f'--epochs {args["epochs"]} ' \

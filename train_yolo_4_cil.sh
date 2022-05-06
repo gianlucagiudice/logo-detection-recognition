@@ -1,5 +1,8 @@
 python train_yolo_4_cil.py --num-class 30 --no-custom-hyper --num-epochs 30 --start-training --yolo-size yolov5m6
+python train_yolo_4_cil.py --num-class 30 --no-custom-hyper --num-epochs 30 --start-training --yolo-size yolov5m6 --img-size 320
+
 python train_yolo_4_cil.py --num-class 100 --no-custom-hyper --num-epochs 30 --start-training --yolo-size yolov5m6
+python train_yolo_4_cil.py --num-class 100 --no-custom-hyper --num-epochs 30 --start-training --yolo-size yolov5m6 --img-size 320
 
 python train_yolo_4_cil.py --num-class 30 --no-custom-hyper --num-epochs 30 --start-training --yolo-size yolov5m
 python train_yolo_4_cil.py --num-class 100 --no-custom-hyper --num-epochs 30 --start-training --yolo-size yolov5m
