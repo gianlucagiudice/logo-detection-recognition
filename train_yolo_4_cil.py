@@ -244,7 +244,7 @@ def main():
               f'--img {args["img_size"]} ' \
               f'--batch {args["batch_size"]} ' \
               f'--epochs {args["epochs"]} ' \
-              f'--weights yolov5/{args["weights"]} ' \
+              f'--weights {args["weights"]} ' \
               f'--project {project} ' \
               f'--name {run_name}'
 
