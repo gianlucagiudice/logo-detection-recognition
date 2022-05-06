@@ -340,6 +340,7 @@ def run(
         nt = torch.zeros(1)
 
     # Print results
+    LOGGER.info(s)
     pf = '%30s' + '%11i' * 2 + '%11.3g' * 4  # print format
     LOGGER.info(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
 
