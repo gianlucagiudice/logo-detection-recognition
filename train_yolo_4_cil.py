@@ -33,6 +33,10 @@ parser = argparse.ArgumentParser(description='Train yolo detector for CIL.')
 parser.add_argument('--num-class', type=int, required=True,
                     help='Number of classes to use for training.')
 
+parser.add_argument('--init-cls', type=int, required=False, default=30, help='Number of initial classes.')
+
+parser.add_argument('--increment-cls', type=int, required=False, default=10, help='Number of increment classes.')
+
 parser.add_argument('--only-det', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Generate files before detection.')
 
@@ -51,13 +55,14 @@ parser.add_argument('--num-epochs', type=int, required=False, default=30, help='
 
 parser.add_argument('--img-size', type=int, required=False, default=512, help='Image size.')
 
+
 cmd_args = parser.parse_args()
 
 args = {
     "dataset": "LogoDet-3K_cropped",
     "shuffle": True,
-    "init_cls": 30,
-    "increment": 10,
+    "init_cls": cmd_args.init_cls,
+    "increment": cmd_args.increment_cls,
     "data_augmentation": True,
     "seed": SEED,
 
