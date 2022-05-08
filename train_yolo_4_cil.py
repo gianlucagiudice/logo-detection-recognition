@@ -139,7 +139,7 @@ def init_folders():
 
     # Delete train/val/test images
     for split_dir in ['train', 'val', 'test']:
-        shutil.rmtree(DATASET_PATH / LOGODET_3K_NORMAL_PATH / split_dir, ignore_errors=True)
+        shutil.rmtree(Path(DATASET_PATH) / LOGODET_3K_NORMAL_PATH / split_dir, ignore_errors=True)
 
     # Delete split files
     for file in ['train.txt', 'validation.txt', 'test.txt']:
