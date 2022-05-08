@@ -137,6 +137,10 @@ def init_folders():
     shutil.rmtree(labels_path, ignore_errors=True)
     os.makedirs(labels_path, exist_ok=False)
 
+    # Delete train/val/test images
+    for split_dir in ['train', 'val', 'test']:
+        shutil.rmtree(DATASET_PATH / LOGODET_3K_NORMAL_PATH / split_dir, ignore_errors=True)
+
     # Delete split files
     for file in ['train.txt', 'validation.txt', 'test.txt']:
         file_path = Path(DATASET_PATH) / DETECTION4CIL_PATH / file
@@ -173,6 +177,7 @@ def generate_split_file(filename, data, metadata):
         # Get the name of the full image which contains the cropped image
         query = f'cropped_image_path == "{Path(image).name}"'
         full_image_row = metadata.query(query)
+        assert len(full_image_row) == 1
         full_image_filename = full_image_row['new_path'].iloc[0]
         full_image_path = Path(DATASET_PATH) / DETECTION4CIL_PATH / 'images' / full_image_filename
         full_images_list.append(str(full_image_path))
@@ -206,7 +211,7 @@ def main():
     if not cmd_args.only_det:
         # Reset folders and files split
         init_folders()
-        # Get dataset
+        # Get dataset instances of cropped iamges
         train, validation, test = init_dataset()
         # Get dataframe
         df_full, df_cropped = read_metadata()
