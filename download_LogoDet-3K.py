@@ -37,6 +37,9 @@ parser.add_argument('--dataset-type', type=str, required=True, default='small',
 parser.add_argument('--sampling-fraction', type=float, required=True, default=1,
                     help='Number of categories to sample.')
 
+parser.add_argument('--num-instances', type=int, required=False, default=None,
+                    help='Number images to sample.')
+
 parser.add_argument('--only-sample', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Number of categories to sample.')
 
@@ -265,6 +268,13 @@ print(f'Number of sampled classes: {len(sampled_classes)} '
 
 # Sample instances
 subset_df = df_for_sampling_method[df_for_sampling_method['brand'].isin(sampled_classes)]
+all_instances = len(subset_df)
+
+if args.num_instances is not None:
+    sample_instances_frac = min(args.num_instances, len(subset_df)) / len(subset_df)
+    subset_df = subset_df.groupby('brand', group_keys=False)
+    subset_df = subset_df.apply(lambda x: x.sample(frac=sample_instances_frac))
+
 training_data, validation_data, test_data = [], [], []
 
 print('Sampling classes . . .')
@@ -298,8 +308,12 @@ brand_mask = df_for_sampling_method[df_path_column].isin(training_data + validat
 extracted_brand = df_for_sampling_method[brand_mask]['brand'].unique()
 assert extracted_brand.size == round(sampling_fraction * len(unique_brands))
 
-print(f'Number of sampled instances: {len(subset_df)} '
+print(f'Number instances: {all_instances} '
+      f'({all_instances / len(df_for_sampling_method) * 100:.4}%)\n'
+      
+      f'Number of sampled instances: {len(subset_df)} '
       f'({len(subset_df) / len(df_for_sampling_method) * 100:.4}%)\n'
+      
       f'Training split info: [\n'
       f'\ttraining = {len(training_data)} ({len(training_data) / len(subset_df)*100:.4}%);\n'
       f'\tvalidation = {len(validation_data)} ({len(validation_data) / len(subset_df)*100:.4}%);\n'
