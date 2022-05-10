@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 from config import DATASET_PATH, LOGODET_3K_NORMAL_PATH
 from pathlib import Path
-from config import SEED
+from config import SEED, WEIGHTS_MODELS_PATH
 import numpy as np
 import argparse
 
@@ -249,7 +249,7 @@ def main():
               f'--img {args["img_size"]} ' \
               f'--batch {args["batch_size"]} ' \
               f'--epochs {args["epochs"]} ' \
-              f'--weights {args["weights"]} ' \
+              f'--weights {Path(WEIGHTS_MODELS_PATH) / args["weights"]} ' \
               f'--project {project} ' \
               f'--name {run_name}'
 
