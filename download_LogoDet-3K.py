@@ -299,7 +299,7 @@ extracted_brand = df_for_sampling_method[brand_mask]['brand'].unique()
 assert extracted_brand.size == round(sampling_fraction * len(unique_brands))
 
 print(f'Number of sampled instances: {len(subset_df)} '
-      f'({len(subset_df) / len(df_metadata_full) * 100:.4}%)\n'
+      f'({len(subset_df) / len(df_for_sampling_method) * 100:.4}%)\n'
       f'Training split info: [\n'
       f'\ttraining = {len(training_data)} ({len(training_data) / len(subset_df)*100:.4}%);\n'
       f'\tvalidation = {len(validation_data)} ({len(validation_data) / len(subset_df)*100:.4}%);\n'
