@@ -36,9 +36,9 @@ parser = argparse.ArgumentParser(description='Train yolo detector for CIL.')
 parser.add_argument('--num-class', type=int, required=True,
                     help='Number of classes to use for training.')
 
-parser.add_argument('--init-cls', type=int, required=False, default=30, help='Number of initial classes.')
+parser.add_argument('--init-cls', type=int, required=True, default=30, help='Number of initial classes.')
 
-parser.add_argument('--increment-cls', type=int, required=False, default=10, help='Number of increment classes.')
+parser.add_argument('--increment-cls', type=int, required=True, default=10, help='Number of increment classes.')
 
 parser.add_argument('--only-det', type=bool, required=False, default=False, action=argparse.BooleanOptionalAction,
                     help='Generate files before detection.')
