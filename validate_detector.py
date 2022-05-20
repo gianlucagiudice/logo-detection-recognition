@@ -297,6 +297,8 @@ def run(
                         labelsn, cropped2metadata, full2cropped_list, cil_class2idx, paths, si)
                     # Assign resolved labels
                     labelsn[:, 0:1] = resolved_labels
+                    # Replace labels in targets (for the plots)
+                    targets[(targets[:, 0] == si).nonzero(as_tuple=False), 1] = resolved_labels
 
                     # Make predictions
                     predictions = torch.zeros(predn.shape[0], 1)
@@ -322,10 +324,14 @@ def run(
 
         # Plot images
         if plots and batch_i < 10:
+            if single_cls:
+                names = {k: 'logo' for k, _ in cil_idx2class.items()}
+            else:
+                names = cil_idx2class
             f = save_dir / f'val_batch{batch_i}_labels.jpg'  # labels
-            Thread(target=plot_images, args=(im, targets, paths, f, cil_idx2class), daemon=True).start()
+            Thread(target=plot_images, args=(im, targets, paths, f, names), daemon=True).start()
             f = save_dir / f'val_batch{batch_i}_pred.jpg'  # predictions
-            Thread(target=plot_images, args=(im, output_to_target(out), paths, f, cil_idx2class), daemon=True).start()
+            Thread(target=plot_images, args=(im, output_to_target(out), paths, f, names), daemon=True).start()
 
         callbacks.run('on_val_batch_end')
 
