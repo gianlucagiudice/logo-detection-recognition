@@ -1,4 +1,5 @@
 import logging
+from threading import Thread
 
 import pandas as pd
 import torch.utils.cpp_extension
@@ -41,7 +42,21 @@ def load_cil_model(cil_model_path):
     for n_classes in np.cumsum(model_dict['task_sizes']):
         cil_model.update_fc(n_classes)
 
-    cil_model.load_state_dict(model_dict['state_dict'])
+    try:
+        cil_model.load_state_dict(model_dict['state_dict'])
+    except RuntimeError:
+        from torch.nn import Conv2d, BatchNorm2d
+        original_layers = dict([(key, value) for key, value in cil_model.named_modules() if
+                                isinstance(value, Conv2d) or isinstance(value, BatchNorm2d)])
+        for key, value in original_layers.items():
+            if isinstance(value, Conv2d):
+                value.weight.data = model_dict['state_dict'][f'{key}.weight']
+            elif isinstance(value, BatchNorm2d):
+                value.weight.data = model_dict['state_dict'][f'{key}.weight']
+                value.bias.data = model_dict['state_dict'][f'{key}.bias']
+                value.running_mean.data = model_dict['state_dict'][f'{key}.running_mean']
+                value.running_var.data = model_dict['state_dict'][f'{key}.running_var']
+        cil_model.load_state_dict(model_dict['state_dict'])
 
     # Eval mode
     cil_model.eval()
