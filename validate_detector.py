@@ -17,7 +17,7 @@ ROOT = FILE.parent  # pycil
 sys.path.append(str(ROOT / 'pycil'))
 from pycil.utils.inc_net import DERNet
 from pycil.utils.transformations import iLogoDet3K_trsf
-
+from pycil.teacher_student import TeacherStudent
 
 def init_logger(log_path):
     logger = logging.getLogger()
@@ -33,39 +33,48 @@ def init_logger(log_path):
     return logger
 
 
-def load_cil_model(cil_model_path):
+def load_cil_model(cil_model_path, student_model_path):
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-    model_dict = torch.load(cil_model_path, map_location=device)
+    if student_model_path:
+        teacher_model, idx2class, class2idx, pred_folder = load_cil_model(cil_model_path, False)
+        lightning_dict = torch.load(student_model_path, map_location=device)
+        teacher_student_model = TeacherStudent(teacher_model, lightning_dict['arch'],  lightning_dict['args'])
+        teacher_student_model.load_state_dict(lightning_dict['state_dict'])
 
-    cil_model = DERNet(model_dict['convnet_type'], model_dict['pretrained'], model_dict['dropout_rate'])
+        final_model = teacher_student_model
 
-    for n_classes in np.cumsum(model_dict['task_sizes']):
-        cil_model.update_fc(n_classes)
+    else:
+        model_dict = torch.load(cil_model_path, map_location=device)
 
-    try:
-        cil_model.load_state_dict(model_dict['state_dict'])
-    except RuntimeError:
-        from torch.nn import Conv2d, BatchNorm2d
-        original_layers = dict([(key, value) for key, value in cil_model.named_modules() if
-                                isinstance(value, Conv2d) or isinstance(value, BatchNorm2d)])
-        for key, value in original_layers.items():
-            if isinstance(value, Conv2d):
-                value.weight.data = model_dict['state_dict'][f'{key}.weight']
-            elif isinstance(value, BatchNorm2d):
-                value.weight.data = model_dict['state_dict'][f'{key}.weight']
-                value.bias.data = model_dict['state_dict'][f'{key}.bias']
-                value.running_mean.data = model_dict['state_dict'][f'{key}.running_mean']
-                value.running_var.data = model_dict['state_dict'][f'{key}.running_var']
-        cil_model.load_state_dict(model_dict['state_dict'])
+        cil_model = DERNet(model_dict['convnet_type'], model_dict['pretrained'], model_dict['dropout_rate'])
 
-    # Eval mode
-    cil_model.eval()
+        for n_classes in np.cumsum(model_dict['task_sizes']):
+            cil_model.update_fc(n_classes)
 
-    n_classes = len(model_dict['class_remap'])
-    assert len(model_dict['cil_class2idx']) == n_classes
-    assert len(model_dict['cil_idx2class']) == n_classes
+        try:
+            cil_model.load_state_dict(model_dict['state_dict'])
+        except RuntimeError:
+            from torch.nn import Conv2d, BatchNorm2d
+            original_layers = dict([(key, value) for key, value in cil_model.named_modules() if
+                                    isinstance(value, Conv2d) or isinstance(value, BatchNorm2d)])
+            for key, value in original_layers.items():
+                if isinstance(value, Conv2d):
+                    value.weight.data = model_dict['state_dict'][f'{key}.weight']
+                elif isinstance(value, BatchNorm2d):
+                    value.weight.data = model_dict['state_dict'][f'{key}.weight']
+                    value.bias.data = model_dict['state_dict'][f'{key}.bias']
+                    value.running_mean.data = model_dict['state_dict'][f'{key}.running_mean']
+                    value.running_var.data = model_dict['state_dict'][f'{key}.running_var']
+            cil_model.load_state_dict(model_dict['state_dict'])
 
-    return cil_model, model_dict['cil_idx2class'], model_dict['cil_class2idx'],  model_dict['cil_prediction2folder']
+        n_classes = len(model_dict['class_remap'])
+        assert len(model_dict['cil_class2idx']) == n_classes
+        assert len(model_dict['cil_idx2class']) == n_classes
+        final_model = cil_model
+        idx2class, class2idx, pred_folder = model_dict['cil_idx2class'], model_dict['cil_class2idx'],  model_dict['cil_prediction2folder']
+
+    final_model.eval()
+    return final_model, idx2class, class2idx, pred_folder
 
 
 def load_cil_image(path, xyxy):
@@ -155,14 +164,15 @@ def run(
         test_instances,
         data,
         cil_model_path=None,
+        student_model_path=None,
         yolo_model_path=None,  # model.pt path(s)
         batch_size=32,  # batch size
         imgsz=640,  # inference size (pixels)
         conf_thres=0.15,  # confidence threshold
-        iou_thres=0.6,  # NMS IoU threshold
+        iou_thres=0.5,  # NMS IoU threshold
         task='test',  # train, val, test, speed or study
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-        workers=8,  # max dataloader workers (per RANK in DDP mode)
+        workers=12,  # max dataloader workers (per RANK in DDP mode)
         single_cls=False,  # treat as single-class dataset
         augment=True,  # augmented inference
         save_txt=False,  # save results to *.txt
@@ -208,7 +218,8 @@ def run(
     data = check_dataset(data)  # check
 
     # Configure
-    cil_model, cil_idx2class, cil_class2idx, cil_class_remap = load_cil_model(ROOT / opt.cil_model_path)
+    cil_model, cil_idx2class, cil_class2idx, cil_class_remap = load_cil_model(
+        ROOT / cil_model_path, student_model_path)
     model.eval()
     cuda = device.type != 'cpu'
 
@@ -321,7 +332,9 @@ def run(
                         xyxy = prediction[:4]
                         img = load_cil_image(paths[si], xyxy)
                         cil_prediction = cil_model(img.expand(1, *img.shape))
-                        logit_argmax = cil_prediction['logits'].argmax().int().item()
+                        if not student_model_path:
+                            cil_prediction = cil_prediction['logits']
+                        logit_argmax = cil_prediction.argmax().int().item()
                         predictions[i] = cil_class_remap[logit_argmax]
 
                     predn[:, 5:6] = predictions
@@ -419,6 +432,7 @@ def parse_opt():
     # Models
     parser.add_argument('--yolo-model-path', type=str, default=ROOT / 'yolov5s.pt', help='model.pt path(s)')
     parser.add_argument('--cil-model-path', type=str, required=True, help='CIL model path')
+    parser.add_argument('--student-model-path', type=str, required=False, help='Student Model of KD')
     # Detector config
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='inference size (pixels)')
     # Detector hyper-parameters
