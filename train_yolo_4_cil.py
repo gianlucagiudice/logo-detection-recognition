@@ -60,7 +60,7 @@ parser.add_argument('--img-size', type=int, required=False, default=512, help='I
 
 parser.add_argument('--batch', type=int, required=False, default=32, help='Batch size.')
 
-yolo_sizes = [f'YOLOv5{size}{version}' for size, version in itertools.product(['s', 'm', 'l'], ['', '6'])]
+yolo_sizes = [f'YOLOv5{size}{version}' for size, version in itertools.product(['s', 'm', 'l', 'x'], ['', '6'])]
 parser.add_argument('--yolo-size', type=str, required=False, default='yolov5m6',
                     choices=yolo_sizes + list(map(lambda x: x.lower(), yolo_sizes)),
                     help='Yolo model size.')
