@@ -355,7 +355,7 @@ def run(
                     resolved_labels = resolve_labels(
                         labelsn, cropped2metadata, full2cropped_list, cil_class2idx, paths, si)
                     # Assign resolved labels
-                    labelsn[:, 0:1] = resolved_labels
+                    labelsn[:, 0:1] = resolved_labels.to(device)
                     # Replace labels in targets (for the plots)
                     targets[(targets[:, 0] == si).nonzero(as_tuple=False), 1] = resolved_labels
 
