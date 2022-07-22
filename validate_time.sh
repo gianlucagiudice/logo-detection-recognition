@@ -12,4 +12,4 @@ python validate_detector.py --name time_classification_pruning --data LogoDet-3K
 
 echo '------------------------ 4 ------------------------'
 echo "Classification mem50 KD"
-python validate_detector.py --name time_classification_kd --data LogoDet-3K_CIL.yaml --yolo-model-path weights/yolov5m6-CIL-512px-2993cls_using1000.pt --cil-model-path weights/CIL_1000_250_2993-WA-mem50-resnet34-pretrained-drop0.5-augmented-adam.pt --student-model-path weights/kd_resnet50-drop0.3-mem50.ckpt --task test --conf-thres 0.001  --eval-time 1000
+python validate_detector.py --name time_classification_kd --data LogoDet-3K_CIL.yaml --yolo-model-path weights/yolov5m6-CIL-512px-2993cls_using1000.pt --cil-model-path weights/CIL_1000_250_2993-WA-mem50-resnet34-pretrained-drop0.5-augmented-adam.pt --student-model-path weights/kd_resnet50-drop0.3-mem50_STATE_DICT.pt --task test --conf-thres 0.001  --eval-time 1000
