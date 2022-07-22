@@ -19,6 +19,7 @@ from pycil.utils.inc_net import DERNet
 from pycil.utils.transformations import iLogoDet3K_trsf
 from pycil.teacher_student import TeacherStudent
 
+
 def init_logger(log_path):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -166,7 +167,7 @@ def run(
         cil_model_path=None,
         student_model_path=None,
         yolo_model_path=None,  # model.pt path(s)
-        batch_size=32,  # batch size
+        batch_size=1,  # batch size
         imgsz=640,  # inference size (pixels)
         conf_thres=0.15,  # confidence threshold
         iou_thres=0.5,  # NMS IoU threshold
@@ -187,6 +188,8 @@ def run(
         plots=True,
         callbacks=Callbacks(),
         compute_loss=None,
+        # Eval time
+        eval_time=0
 ):
 
     # Initialize/load model and set device
@@ -240,6 +243,9 @@ def run(
     niou = iouv.numel()
 
     # Dataloader
+    if eval_time:
+        batch_size = 1
+
     if not training:
         model.warmup(imgsz=(1 if pt else batch_size, 3, imgsz, imgsz))  # warmup
         pad = 0.0 if task in ('speed', 'benchmark') else 0.5
@@ -263,8 +269,26 @@ def run(
     jdict, stats, ap, ap_class = [], [], [], []
     callbacks.run('on_val_start')
 
-    pbar = tqdm(dataloader, desc=s, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}')  # progress bar
+    print(f'Batch_size: {dataloader.batch_size}')
+
+    if eval_time:
+        pbar = tqdm(dataloader, desc=s, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}', total=eval_time)  # progress bar
+    else:
+        pbar = tqdm(dataloader, desc=s, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}')  # progress bar
+
+    eval_time_i = eval_time
+    dt_list = []
     for batch_i, (im, targets, paths, shapes) in enumerate(pbar):
+        dt_dict = {}
+
+        if eval_time and eval_time_i <= 0:
+
+            with open(save_dir / 'times.pickle', 'wb') as f:
+                pickle.dump(dt_list, f)
+
+            print('End')
+            exit(0)
+
         callbacks.run('on_val_batch_start')
         t1 = time_sync()
         if cuda:
@@ -275,10 +299,15 @@ def run(
         nb, _, height, width = im.shape  # batch size, channels, height, width
         t2 = time_sync()
         dt[0] += t2 - t1
+        dt_dict['convert_img'] = t2 - t1
 
         # Inference
+        t_temp = time_sync()
         out, train_out = model(im) if training else model(im, augment=augment, val=True)  # inference, loss outputs
+        t_temp_final = time_sync() - t_temp
         dt[1] += time_sync() - t2
+
+        dt_dict['yolo_inference'] = t_temp_final
 
         # Loss
         if compute_loss:
@@ -288,8 +317,12 @@ def run(
         targets[:, 2:] *= torch.tensor((width, height, width, height), device=device)  # to pixels
         lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
         t3 = time_sync()
+        t_temp = time_sync()
         out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=True)
+        t_temp_final = time_sync() - t_temp
         dt[2] += time_sync() - t3
+
+        dt_dict['non_max_supp'] = t_temp_final
 
         # Metrics
         for si, pred in enumerate(out):
@@ -326,6 +359,9 @@ def run(
                     # Replace labels in targets (for the plots)
                     targets[(targets[:, 0] == si).nonzero(as_tuple=False), 1] = resolved_labels
 
+                    # ------- Classification of ROIs -------
+                    t4 = time_sync()
+
                     # Make predictions
                     predictions = torch.zeros(predn.shape[0], 1)
                     for i, prediction in enumerate(predn):
@@ -338,6 +374,8 @@ def run(
                         predictions[i] = cil_class_remap[logit_argmax]
 
                     predn[:, 5:6] = predictions
+
+                    dt_dict['cil_inference'] = time_sync() - t4
 
                 correct = process_batch(predn, labelsn, iouv)
                 if plots:
@@ -362,6 +400,10 @@ def run(
             Thread(target=plot_images, args=(im, output_to_target(out), paths, f, names), daemon=True).start()
 
         callbacks.run('on_val_batch_end')
+
+        dt_list.append(dt_dict)
+        if eval_time:
+            eval_time_i = eval_time_i - 1
 
     # Compute metrics
     stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*stats)]  # to numpy
@@ -436,8 +478,12 @@ def parse_opt():
     # Detector config
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='inference size (pixels)')
     # Detector hyper-parameters
-    parser.add_argument('--iou-thres', type=float, default=0.6, help='NMS IoU threshold')
+    parser.add_argument('--iou-thres', type=float, default=0.5, help='NMS IoU threshold')
     parser.add_argument('--conf-thres', type=float, default=0.001, help='confidence threshold')
+
+    # Detector hyper-parameters
+    parser.add_argument('--eval-time', type=int, default=None, help='evaluation time')
+
     # Other
     parser.add_argument('--batch-size', type=int, default=32, help='batch size')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
