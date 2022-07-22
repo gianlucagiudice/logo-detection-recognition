@@ -106,7 +106,7 @@ def resolve_labels(labelsn, cropped2metadata, full2cropped_list, names2id, paths
     # Resolve labels
     for i, yolo in enumerate(labels_yolo):
         # Get the nearest label
-        d = torch.tensor([((yolo - gt) ** 2).sum() for gt in labels_gt])
+        d = torch.tensor([((yolo - gt) ** 2).sum() for gt in labels_gt]).cpu()
         resolved = d.argmin().item()
         # Resolve labels
         resolved_labels[i] = names2id[brands_gt[resolved]]
