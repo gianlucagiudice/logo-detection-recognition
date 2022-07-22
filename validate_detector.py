@@ -80,7 +80,7 @@ def load_cil_model(cil_model_path, student_model_path):
 
 def load_cil_image(path, xyxy):
     # Unzip prediction
-    xyxy = np.array(xyxy.round(), dtype=int)
+    xyxy = np.array(xyxy.round().cpu(), dtype=int)
     # Read the image
     with open(path, 'rb') as f:
         img = Image.open(f)
