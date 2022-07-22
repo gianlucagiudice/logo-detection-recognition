@@ -367,7 +367,7 @@ def run(
                     predictions = torch.zeros(predn.shape[0], 1)
                     for i, prediction in enumerate(predn):
                         xyxy = prediction[:4]
-                        img = load_cil_image(paths[si], xyxy)
+                        img = load_cil_image(paths[si], xyxy).to(device)
                         cil_prediction = cil_model(img.expand(1, *img.shape))
                         if not student_model_path:
                             cil_prediction = cil_prediction['logits']
